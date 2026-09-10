@@ -1,17 +1,17 @@
 import Editor from '@monaco-editor/react'
 import { useEffect, useState } from 'react'
 import { apiRequest } from '../api/client'
-import { createBrowserPythonRunner } from '../python/PythonRunner'
+import type { PythonRunner } from '../python/PythonRunner'
+import type { GamePythonBridge } from '../game/GamePythonBridge'
 import type { PythonRuntimeState } from '../python/pythonProtocol'
 
 type CodeResponse = { code: string }
 type SaveState = 'loading' | 'saved' | 'unsaved' | 'saving'
 
-export function CodeArea() {
+export function CodeArea({ runner, bridge, gameOutput }: { runner: PythonRunner; bridge: GamePythonBridge; gameOutput: string }) {
   const [code, setCode] = useState('')
   const [state, setState] = useState<SaveState>('loading')
   const [error, setError] = useState('')
-  const [runner] = useState(() => createBrowserPythonRunner())
   const [runtimeState, setRuntimeState] = useState<PythonRuntimeState>(runner.runtimeState)
   const [isRunning, setIsRunning] = useState(false)
   const [output, setOutput] = useState('')
@@ -20,7 +20,6 @@ export function CodeArea() {
     const unsubscribe = runner.subscribe(setRuntimeState)
     return () => {
       unsubscribe()
-      runner.dispose()
     }
   }, [runner])
 
@@ -73,6 +72,13 @@ export function CodeArea() {
     }
   }
 
+  const apply = async () => {
+    setIsRunning(true)
+    setOutput('')
+    await bridge.apply(code)
+    setIsRunning(false)
+  }
+
   return (
     <section className="code-panel" aria-labelledby="code-title">
       <h2 id="code-title">player.py</h2>
@@ -99,6 +105,9 @@ export function CodeArea() {
         >
           {isRunning ? 'Running…' : 'Run'}
         </button>
+        <button className="secondary" onClick={apply} disabled={runtimeState !== 'ready' || isRunning}>
+          Apply
+        </button>
         <span className={`save-status ${error ? 'error' : ''}`} aria-live="polite">
           {error || status}
         </span>
@@ -108,7 +117,7 @@ export function CodeArea() {
       </div>
       <section className="output-panel" aria-labelledby="output-title">
         <h3 id="output-title">OUTPUT</h3>
-        <pre aria-live="polite">{output}</pre>
+        <pre aria-live="polite">{gameOutput || output}</pre>
       </section>
     </section>
   )

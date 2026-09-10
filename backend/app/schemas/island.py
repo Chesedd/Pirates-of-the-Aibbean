@@ -8,6 +8,11 @@ class PlayerState(BaseModel):
     y: int
 
 
+class PlayerPositionUpdate(BaseModel):
+    x: int
+    y: int
+
+
 class IslandPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

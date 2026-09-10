@@ -3,12 +3,26 @@ import { apiRequest } from '../api/client'
 import type { User } from '../app/App'
 import { GameCanvas } from '../game/GameCanvas'
 import { CodeArea } from '../components/CodeArea'
+import { createBrowserPythonRunner } from '../python/PythonRunner'
+import { GamePythonBridge } from '../game/GamePythonBridge'
 
 export type Island = { id: number; player: { x: number; y: number } }
 
 export function UserPage({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [island, setIsland] = useState<Island | null>(null)
   const [error, setError] = useState('')
+  const [output, setOutput] = useState('')
+  const [runner] = useState(() => createBrowserPythonRunner())
+  const [bridge] = useState(() => {
+    let lastSave = 0
+    return new GamePythonBridge(runner, setOutput, (position) => {
+      if (Date.now() - lastSave < 5_000) return
+      lastSave = Date.now()
+      void apiRequest('/game/position', { method: 'PUT', body: JSON.stringify(position) })
+    })
+  })
+
+  useEffect(() => () => runner.dispose(), [runner])
 
   useEffect(() => {
     apiRequest<Island>('/game/island').then(setIsland).catch((reason: Error) => setError(reason.message))
@@ -23,9 +37,9 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
       <div className="game-pane">
         {error && <p className="error game-status">Could not load the island: {error}</p>}
         {!error && !island && <p className="game-status">Charting your island…</p>}
-        {island && <GameCanvas island={island} />}
+        {island && <GameCanvas island={island} bridge={bridge} />}
       </div>
-      <CodeArea />
+      <CodeArea runner={runner} bridge={bridge} gameOutput={output} />
     </div>
   </main>
 }

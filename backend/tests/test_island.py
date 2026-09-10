@@ -68,6 +68,22 @@ def test_duplicate_island_is_rejected(users, db: Session) -> None:
     db.rollback()
 
 
+def test_user_can_update_only_their_own_position(client: TestClient, users, db: Session) -> None:
+    login(client)
+    owner = create_regular_user(client, "moving-player")
+    other = create_regular_user(client, "position-owner")
+    owner_island = db.scalar(select(Island).where(Island.user_id == owner["id"]))
+    other_island = db.scalar(select(Island).where(Island.user_id == other["id"]))
+    client.post("/auth/logout")
+    login(client, "moving-player", "temporary-password")
+    response = client.put(f"/game/position?user_id={other['id']}&island_id={other_island.id}", json={"x": 123, "y": 234})
+    assert response.status_code == 200
+    db.refresh(owner_island)
+    db.refresh(other_island)
+    assert (owner_island.player_x, owner_island.player_y) == (123, 234)
+    assert (other_island.player_x, other_island.player_y) == (400, 300)
+
+
 def test_user_and_island_creation_is_atomic(client: TestClient, users, db: Session, monkeypatch) -> None:
     login(client)
     original_flush = db.flush
