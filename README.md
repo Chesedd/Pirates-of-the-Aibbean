@@ -1,6 +1,6 @@
 # Pirates of the Aibbean
 
-Минимальный monorepo-каркас браузерной учебной игры. На текущем этапе в нём есть только React-интерфейс с демонстрационной Phaser-сценой, заготовка API-клиента и FastAPI health check с проверкой PostgreSQL. Игровая механика и редактор кода намеренно не реализованы.
+Monorepo-каркас браузерной учебной игры. Второй этап добавляет пользователей, cookie-сессии, роли и минимальный интерфейс администратора. Игровая механика и редактор кода намеренно не реализованы.
 
 ## Требования
 
@@ -50,6 +50,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
@@ -58,6 +59,26 @@ API будет доступен на `http://localhost:8000`, а health check �
 ```bash
 docker compose up --build
 ```
+
+### Первый администратор
+
+Публичной регистрации нет. После применения миграций однократно передайте учётные данные через окружение и запустите CLI:
+
+```bash
+cd backend
+BOOTSTRAP_ADMIN_USERNAME=admin \
+BOOTSTRAP_ADMIN_PASSWORD='replace-with-a-long-random-password' \
+python -m app.bootstrap_admin
+```
+
+Команда идемпотентна: пользователь с таким именем повторно не создаётся. Не сохраняйте эти значения в `.env` после настройки. В production также включите `SESSION_COOKIE_SECURE=true`, используйте HTTPS и задайте точный HTTPS-origin frontend в `CORS_ORIGINS`.
+
+### API авторизации и администрирования
+
+- `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`;
+- `GET /admin/users`, `POST /admin/users` (только роль `admin`).
+
+Сессия хранится на сервере, а браузер получает только случайный непрозрачный токен в HTTP-only cookie. Пароли хешируются Argon2.
 
 ### Frontend
 
