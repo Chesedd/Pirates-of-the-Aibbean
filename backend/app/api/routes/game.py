@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import current_user
 from app.database.session import get_db
+from app.game.island_geometry import SAFE_SPAWN, position_is_on_island
 from app.models.user import Island, PlayerCode, User, UserProgress
 from app.schemas.code import PlayerCodePayload, PlayerCodePublic
 from app.schemas.island import IslandPublic, PlayerPositionUpdate
@@ -27,6 +28,10 @@ def get_island(user: User = Depends(current_user), db: Session = Depends(get_db)
     island = db.scalar(select(Island).where(Island.user_id == user.id))
     if island is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Island not found")
+    if not position_is_on_island(island.generation_seed, island.player_x, island.player_y):
+        island.player_x, island.player_y = SAFE_SPAWN
+        db.commit()
+        db.refresh(island)
     return IslandPublic.from_island(island)
 
 
@@ -35,6 +40,8 @@ def update_position(payload: PlayerPositionUpdate, user: User = Depends(current_
     island = db.scalar(select(Island).where(Island.user_id == user.id))
     if island is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Island not found")
+    if not position_is_on_island(island.generation_seed, payload.x, payload.y):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Position is outside the island")
     island.player_x, island.player_y = payload.x, payload.y
     db.commit()
     db.refresh(island)

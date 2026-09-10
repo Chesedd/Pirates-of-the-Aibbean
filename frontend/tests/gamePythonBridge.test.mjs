@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { GamePythonBridge, MAX_TICK_MOVE } from '../.test-dist/game/GamePythonBridge.js'
+import { generateIslandGeometry, ISLAND_CENTER } from '../.test-dist/game/islandGeometry.js'
 
 const keys = { up: false, down: false, left: false, right: false }
 const position = { x: 100, y: 100 }
@@ -52,4 +53,38 @@ test('concurrent ticks are dropped instead of queued', async () => {
   assert.equal(calls, 1)
   finish({ ...position, stdout: '' })
   await first
+})
+
+function collisionBridge(move) {
+  const bridge = new GamePythonBridge({
+    apply: async () => {},
+    tick: async (_keys, current) => ({ ...move(current), stdout: '' }),
+  })
+  bridge.setIslandGeometry(generateIslandGeometry(42))
+  return bridge
+}
+
+test('movement within the island is accepted', async () => {
+  const bridge = collisionBridge(({ x, y }) => ({ x: x + 10, y }))
+  await bridge.apply('move')
+  assert.deepEqual(await bridge.tick(keys, { x: ISLAND_CENTER, y: ISLAND_CENTER }),
+    { x: ISLAND_CENTER + 10, y: ISLAND_CENTER })
+})
+
+test('an attempt to cross the coast is rejected at the last valid position', async () => {
+  const coastline = generateIslandGeometry(42)
+  const shore = coastline.reduce((rightmost, point) => point.x > rightmost.x ? point : rightmost)
+  const positionNearShore = { x: shore.x - 1, y: shore.y }
+  const bridge = collisionBridge(() => ({ x: shore.x + 1000, y: shore.y }))
+  await bridge.apply('escape')
+  assert.deepEqual(await bridge.tick(keys, positionNearShore), positionNearShore)
+})
+
+test('movement parallel to the coast remains available', async () => {
+  const coastline = generateIslandGeometry(42)
+  const shore = coastline.reduce((rightmost, point) => point.x > rightmost.x ? point : rightmost)
+  const positionNearShore = { x: shore.x - 25, y: shore.y }
+  const bridge = collisionBridge(({ x, y }) => ({ x, y: y + 10 }))
+  await bridge.apply('along coast')
+  assert.deepEqual(await bridge.tick(keys, positionNearShore), { x: positionNearShore.x, y: positionNearShore.y + 10 })
 })

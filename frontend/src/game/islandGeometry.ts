@@ -1,6 +1,7 @@
 export const ISLAND_SIZE = 5200
 export const ISLAND_CENTER = ISLAND_SIZE / 2
 export const ISLAND_VERTEX_COUNT = 144
+export const SAFE_SPAWN: Point = { x: ISLAND_CENTER, y: ISLAND_CENTER }
 
 export type Point = { x: number; y: number }
 
@@ -52,6 +53,7 @@ export function generateIslandGeometry(seed: number): Point[] {
 }
 
 export function pointIsInsideIsland(point: Point, coastline: Point[]): boolean {
+  if (coastline.length < 3) return false
   let inside = false
   for (let current = 0, previous = coastline.length - 1; current < coastline.length; previous = current++) {
     const a = coastline[current]
