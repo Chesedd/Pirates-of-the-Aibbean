@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import admin_user
 from app.core.security import hash_password
 from app.database.session import get_db
-from app.models.user import Island, PlayerCode, Role, User
+from app.models.user import Island, PlayerCode, Role, User, UserProgress
 from app.schemas.user import UserCreate, UserListItem, UserPublic
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(admin_user)])
@@ -26,6 +26,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
         if user.role == Role.USER:
             db.add(Island(user_id=user.id))
             db.add(PlayerCode(user_id=user.id))
+            db.add(UserProgress(user_id=user.id))
         db.commit()
     except IntegrityError:
         db.rollback()

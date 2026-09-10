@@ -25,6 +25,9 @@ class User(Base):
     player_code: Mapped["PlayerCode | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    progress: Mapped["UserProgress | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class UserSession(Base):
@@ -63,3 +66,28 @@ class PlayerCode(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     user: Mapped[User] = relationship(back_populates="player_code")
+
+
+class UserProgress(Base):
+    __tablename__ = "user_progress"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    user: Mapped[User] = relationship(back_populates="progress")
+    unlocks: Mapped[list["UserUnlock"]] = relationship(
+        back_populates="progress", cascade="all, delete-orphan"
+    )
+
+
+class UserUnlock(Base):
+    __tablename__ = "user_unlocks"
+
+    progress_id: Mapped[int] = mapped_column(
+        ForeignKey("user_progress.id", ondelete="CASCADE"), primary_key=True
+    )
+    key: Mapped[str] = mapped_column(String(50), primary_key=True)
+    unlocked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    progress: Mapped[UserProgress] = relationship(back_populates="unlocks")
