@@ -1,16 +1,20 @@
 import Phaser from 'phaser'
-import { DemoScene } from './scenes/DemoScene'
+import { IslandScene } from './scenes/IslandScene'
+import type { Island } from '../pages/UserPage'
 
-export function createGame(parent: HTMLElement): Phaser.Game {
+export function createGame(parent: HTMLElement, island: Island): Phaser.Game {
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,
-    backgroundColor: '#102c44',
+    backgroundColor: '#176b87',
     scale: {
       mode: Phaser.Scale.RESIZE,
       width: '100%',
       height: '100%',
     },
-    scene: DemoScene,
+    scene: IslandScene,
+    callbacks: {
+      preBoot: (game) => game.registry.set('island', island),
+    },
   })
 }
