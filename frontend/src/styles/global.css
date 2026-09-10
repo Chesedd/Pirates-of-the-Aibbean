@@ -18,11 +18,15 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: .75rem; bord
 .game-pane { min-width: 0; min-height: 34rem; display: grid; }
 .game-canvas { width: 100%; min-height: 34rem; height: calc(100vh - 5.5rem); overflow: hidden; }
 .game-canvas canvas { display: block; }.game-status { align-self: center; justify-self: center; }
-.code-panel { min-width: 0; min-height: 34rem; display: grid; grid-template-rows: auto 1fr auto; padding: 1rem; gap: .8rem; border-left: 1px solid #315369; background: #0b2538; }
+.code-panel { min-width: 0; min-height: 34rem; display: grid; grid-template-rows: auto minmax(18rem, 1fr) auto minmax(7rem, auto); padding: 1rem; gap: .8rem; border-left: 1px solid #315369; background: #0b2538; }
 .code-panel h2 { margin: 0; font: 600 1rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .code-editor { min-height: 25rem; overflow: hidden; border: 1px solid #315369; }
 .code-actions { display: flex; align-items: center; gap: 1rem; min-height: 2.8rem; }
 .save-status { color: #b8cbd5; font-size: .9rem; }
+.python-status { margin-left: auto; color: #91adbb; font-size: .9rem; }
+.output-panel { min-height: 7rem; overflow: auto; padding: .7rem; border: 1px solid #315369; background: #071a28; }
+.output-panel h3 { margin: 0 0 .5rem; color: #91adbb; font: 700 .75rem ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .08em; }
+.output-panel pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #edf6f9; font: .85rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; }
 @media (max-width: 850px) {
   .game-workspace { grid-template-columns: 1fr; }
   .game-canvas { height: 34rem; }
