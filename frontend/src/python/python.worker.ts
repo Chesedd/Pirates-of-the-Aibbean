@@ -8,6 +8,8 @@ const PYODIDE_BASE_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/f
 type PyProxy = {
   destroy?: () => void
   toString: () => string
+  set?: (name: string, value: unknown) => void
+  toJs?: () => unknown[]
 }
 
 type Pyodide = {
@@ -24,6 +26,7 @@ type PyodideModule = {
 const send = (message: PythonWorkerResponse) => self.postMessage(message)
 
 let pyodide: Pyodide
+let gameCode: PyProxy | null = null
 
 async function initialise() {
   // The URL is fixed and never contains user input. @vite-ignore keeps Pyodide and
@@ -34,18 +37,38 @@ async function initialise() {
 }
 
 self.onmessage = async (event: MessageEvent<PythonWorkerRequest>) => {
-  if (event.data.type !== 'run') return
-
-  const { code, runId } = event.data
+  const { runId } = event.data
   const stdout: string[] = []
   const stderr: string[] = []
   pyodide.setStdout({ batched: (text) => stdout.push(text) })
   pyodide.setStderr({ batched: (text) => stderr.push(text) })
 
-  // A new dictionary gives every ordinary Run a clean set of Python globals.
   const globals = pyodide.globals.get('dict')()
   try {
-    const value = await pyodide.runPythonAsync(code, { globals })
+    if (event.data.type === 'apply') {
+      const compiled = await pyodide.runPythonAsync(
+        `compile(${JSON.stringify(event.data.code)}, "player.py", "exec")`, { globals },
+      ) as PyProxy
+      gameCode?.destroy?.()
+      gameCode = compiled
+      send({ type: 'applied', runId })
+      return
+    }
+    if (event.data.type === 'tick') {
+      if (!gameCode) throw new Error('No game program has been applied.')
+      const { keys, position } = event.data
+      const prelude = `x=${JSON.stringify(position.x)}\ny=${JSON.stringify(position.y)}\n_keys=${JSON.stringify(keys)}\ndef key_pressed(key):\n return bool(_keys.get(key, False))`
+      await pyodide.runPythonAsync(prelude, { globals })
+      globals.set?.('__game_code', gameCode)
+      await pyodide.runPythonAsync('exec(__game_code)', { globals })
+      const value = await pyodide.runPythonAsync('(x, y)', { globals }) as PyProxy & { toJs?: () => unknown[] }
+      const [x, y] = value.toJs?.() ?? []
+      value.destroy?.()
+      send({ type: 'tickResult', runId, x, y, stdout: stdout.join('\n') })
+      return
+    }
+    // A new dictionary gives every ordinary Run a clean set of Python globals.
+    const value = await pyodide.runPythonAsync(event.data.code, { globals })
     const result = value == null ? '' : String(value)
     if (typeof value === 'object' && value && 'destroy' in value) {
       (value as PyProxy).destroy?.()

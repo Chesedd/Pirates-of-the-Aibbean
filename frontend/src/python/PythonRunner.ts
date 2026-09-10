@@ -1,5 +1,8 @@
 import type {
   PythonRunResult,
+  PythonTickResult,
+  GameKeys,
+  GamePosition,
   PythonRuntimeState,
   PythonWorkerRequest,
   PythonWorkerResponse,
@@ -30,10 +33,13 @@ export class SupersededRunError extends Error {
 
 type PendingRun = {
   id: number
-  resolve: (result: PythonRunResult) => void
+  resolve: (result: PythonRunResult | PythonTickResult | void) => void
   reject: (reason: Error) => void
   timer: ReturnType<typeof setTimeout>
 }
+type WorkerRequestWithoutId = PythonWorkerRequest extends infer Request
+  ? Request extends { runId: number } ? Omit<Request, 'runId'> : never
+  : never
 
 export class PythonRunner {
   private worker: WorkerLike | null = null
@@ -60,25 +66,35 @@ export class PythonRunner {
   }
 
   run(code: string): Promise<PythonRunResult> {
+    return this.request<PythonRunResult>({ type: 'run', code })
+  }
+
+  apply(code: string): Promise<void> {
+    return this.request<void>({ type: 'apply', code })
+  }
+
+  tick(keys: GameKeys, position: GamePosition): Promise<PythonTickResult> {
+    return this.request<PythonTickResult>({ type: 'tick', keys, position })
+  }
+
+  private request<T>(request: WorkerRequestWithoutId): Promise<T> {
     if (this.state !== 'ready' || !this.worker) {
       return Promise.reject(new Error('Python runtime is not ready.'))
     }
 
     if (this.pending) {
-      this.rejectPending(new SupersededRunError())
-      this.restartWorker()
-      return Promise.reject(new Error('Python runtime is restarting.'))
+      return Promise.reject(new SupersededRunError())
     }
 
     const id = this.nextId++
-    return new Promise((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         if (this.pending?.id !== id) return
         this.rejectPending(new ExecutionTimeoutError())
         this.restartWorker()
       }, this.timeoutMs)
-      this.pending = { id, resolve, reject, timer }
-      this.worker?.postMessage({ type: 'run', runId: id, code })
+      this.pending = { id, resolve: resolve as PendingRun['resolve'], reject, timer }
+      this.worker?.postMessage({ ...request, runId: id } as PythonWorkerRequest)
     })
   }
 
@@ -119,6 +135,10 @@ export class PythonRunner {
     clearTimeout(pending.timer)
     if (message.type === 'result') {
       pending.resolve({ stdout: message.stdout, result: message.result })
+    } else if (message.type === 'applied') {
+      pending.resolve()
+    } else if (message.type === 'tickResult') {
+      pending.resolve({ x: message.x, y: message.y, stdout: message.stdout })
     } else {
       const error = new Error(message.error)
       error.name = 'PythonError'
