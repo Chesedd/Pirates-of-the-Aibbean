@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "isolatedModules": false,
+    "outDir": ".test-dist",
+    "rootDir": "src"
+  },
+  "include": ["src/python/PythonRunner.ts", "src/python/pythonProtocol.ts"]
+}
