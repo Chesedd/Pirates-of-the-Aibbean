@@ -8,7 +8,16 @@ import type { PythonRuntimeState } from '../python/pythonProtocol'
 type CodeResponse = { code: string }
 type SaveState = 'loading' | 'saved' | 'unsaved' | 'saving'
 
-export function CodeArea({ runner, bridge, gameOutput }: { runner: PythonRunner; bridge: GamePythonBridge; gameOutput: string }) {
+type CodeAreaProps = {
+  runner: PythonRunner
+  bridge: GamePythonBridge
+  gameOutput: string
+  isOpen: boolean
+  onClose: () => void
+  onEditorFocusChange: (focused: boolean) => void
+}
+
+export function CodeArea({ runner, bridge, gameOutput, isOpen, onClose, onEditorFocusChange }: CodeAreaProps) {
   const [code, setCode] = useState('')
   const [state, setState] = useState<SaveState>('loading')
   const [error, setError] = useState('')
@@ -80,8 +89,11 @@ export function CodeArea({ runner, bridge, gameOutput }: { runner: PythonRunner;
   }
 
   return (
-    <section className="code-panel" aria-labelledby="code-title">
-      <h2 id="code-title">player.py</h2>
+    <section className="code-panel" aria-labelledby="code-title" hidden={!isOpen}>
+      <div className="code-panel-header">
+        <h2 id="code-title">player.py</h2>
+        <button className="code-panel-close secondary" type="button" onClick={onClose} aria-label="Close player.py editor">Close</button>
+      </div>
       <div className="code-editor">
         <Editor
           language="python"
@@ -92,6 +104,10 @@ export function CodeArea({ runner, bridge, gameOutput }: { runner: PythonRunner;
             setCode(value ?? '')
             setState('unsaved')
             setError('')
+          }}
+          onMount={(editor) => {
+            editor.onDidFocusEditorText(() => onEditorFocusChange(true))
+            editor.onDidBlurEditorText(() => onEditorFocusChange(false))
           }}
           options={{ minimap: { enabled: false }, automaticLayout: true, fontSize: 14 }}
         />
