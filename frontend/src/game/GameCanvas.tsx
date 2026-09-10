@@ -3,6 +3,7 @@ import type Phaser from 'phaser'
 import { createGame } from './createGame'
 import type { Island } from '../pages/UserPage'
 import type { GamePythonBridge } from './GamePythonBridge'
+import { GameSceneLifecycle } from './GameSceneLifecycle'
 
 type GameCanvasProps = {
   island: Island
@@ -15,27 +16,33 @@ type GameCanvasProps = {
 export function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick }: GameCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
+  const lifecycleRef = useRef<GameSceneLifecycle | null>(null)
+  const keyboardEnabledRef = useRef(keyboardEnabled)
+  keyboardEnabledRef.current = keyboardEnabled
 
   useEffect(() => {
     if (!containerRef.current) return
 
-    const game = createGame(containerRef.current, island, bridge, username, onPlayerClick)
+    const lifecycle = new GameSceneLifecycle(keyboardEnabledRef.current)
+    lifecycleRef.current = lifecycle
+    const game = createGame(containerRef.current, island, bridge, username, onPlayerClick, {
+      onReady: (scene) => lifecycle.sceneReady(scene),
+      onShutdown: (scene) => lifecycle.sceneShutdown(scene),
+    })
     gameRef.current = game
+    let cleanedUp = false
     return () => {
-      gameRef.current = null
+      if (cleanedUp) return
+      cleanedUp = true
+      lifecycle.dispose()
+      if (lifecycleRef.current === lifecycle) lifecycleRef.current = null
+      if (gameRef.current === game) gameRef.current = null
       game.destroy(true)
     }
   }, [island, bridge, username, onPlayerClick])
 
   useEffect(() => {
-    const keyboard = gameRef.current?.input.keyboard
-    if (!keyboard) return
-    keyboard.enabled = keyboardEnabled
-    const sceneKeyboard = gameRef.current?.scene.getScene('island').input.keyboard
-    if (sceneKeyboard) {
-      sceneKeyboard.enabled = keyboardEnabled
-      if (!keyboardEnabled) sceneKeyboard.resetKeys()
-    }
+    lifecycleRef.current?.setKeyboardEnabled(keyboardEnabled)
   }, [keyboardEnabled])
 
   return <div className="game-canvas" ref={containerRef} aria-label="Your island game view" />

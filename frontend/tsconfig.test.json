@@ -6,5 +6,5 @@
     "outDir": ".test-dist",
     "rootDir": "src"
   },
-  "include": ["src/python/PythonRunner.ts", "src/python/pythonProtocol.ts", "src/game/GamePythonBridge.ts"]
+  "include": ["src/python/PythonRunner.ts", "src/python/pythonProtocol.ts", "src/game/GamePythonBridge.ts", "src/game/GameSceneLifecycle.ts"]
 }
