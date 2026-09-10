@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import current_user
 from app.database.session import get_db
-from app.models.user import Island, User
+from app.models.user import Island, PlayerCode, User
+from app.schemas.code import PlayerCodePayload, PlayerCodePublic
 from app.schemas.island import IslandPublic
 
 router = APIRouter(prefix="/game", tags=["game"])
@@ -16,3 +17,26 @@ def get_island(user: User = Depends(current_user), db: Session = Depends(get_db)
     if island is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Island not found")
     return IslandPublic.from_island(island)
+
+
+@router.get("/code", response_model=PlayerCodePublic)
+def get_code(user: User = Depends(current_user), db: Session = Depends(get_db)) -> PlayerCode:
+    player_code = db.scalar(select(PlayerCode).where(PlayerCode.user_id == user.id))
+    if player_code is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Player code not found")
+    return player_code
+
+
+@router.put("/code", response_model=PlayerCodePublic)
+def save_code(
+    payload: PlayerCodePayload,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> PlayerCode:
+    player_code = db.scalar(select(PlayerCode).where(PlayerCode.user_id == user.id))
+    if player_code is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Player code not found")
+    player_code.code = payload.code
+    db.commit()
+    db.refresh(player_code)
+    return player_code
