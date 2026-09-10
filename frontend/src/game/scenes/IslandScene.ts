@@ -30,6 +30,7 @@ export class IslandScene extends Phaser.Scene {
     graphics.fillPoints(interior, true)
 
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
+    this.bridge.setIslandGeometry(coastline)
     const body = this.add.circle(0, 0, 17, 0xf4e4c1).setStrokeStyle(5, 0x7a352c)
     const hat = this.add.triangle(0, -22, -15, 12, 0, -13, 15, 12, 0xc93f32)
     const name = this.add.text(0, 29, this.registry.get('username') as string, {

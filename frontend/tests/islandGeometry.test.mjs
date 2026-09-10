@@ -6,6 +6,7 @@ import {
   ISLAND_CENTER,
   ISLAND_SIZE,
   pointIsInsideIsland,
+  SAFE_SPAWN,
 } from '../.test-dist/game/islandGeometry.js'
 
 test('the same seed makes identical geometry and different seeds make different coastlines', () => {
@@ -15,8 +16,14 @@ test('the same seed makes identical geometry and different seeds make different 
 
 test('the safe spawn is inside every sampled island', () => {
   for (const seed of [0, 1, 42, 999999999]) {
-    assert.equal(pointIsInsideIsland({ x: ISLAND_CENTER, y: ISLAND_CENTER }, generateIslandGeometry(seed)), true)
+    assert.equal(pointIsInsideIsland(SAFE_SPAWN, generateIslandGeometry(seed)), true)
   }
+})
+
+test('the center is land and a distant point is water', () => {
+  const coastline = generateIslandGeometry(42)
+  assert.equal(pointIsInsideIsland({ x: ISLAND_CENTER, y: ISLAND_CENTER }, coastline), true)
+  assert.equal(pointIsInsideIsland({ x: -10_000, y: -10_000 }, coastline), false)
 })
 
 test('camera is bounded to the large world and follows the player', () => {

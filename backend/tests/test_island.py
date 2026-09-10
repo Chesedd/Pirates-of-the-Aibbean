@@ -79,11 +79,11 @@ def test_user_can_update_only_their_own_position(client: TestClient, users, db: 
     other_island = db.scalar(select(Island).where(Island.user_id == other["id"]))
     client.post("/auth/logout")
     login(client, "moving-player", "temporary-password")
-    response = client.put(f"/game/position?user_id={other['id']}&island_id={other_island.id}", json={"x": 123, "y": 234})
+    response = client.put(f"/game/position?user_id={other['id']}&island_id={other_island.id}", json={"x": 2610, "y": 2610})
     assert response.status_code == 200
     db.refresh(owner_island)
     db.refresh(other_island)
-    assert (owner_island.player_x, owner_island.player_y) == (123, 234)
+    assert (owner_island.player_x, owner_island.player_y) == (2610, 2610)
     assert (other_island.player_x, other_island.player_y) == (2600, 2600)
 
 
@@ -97,6 +97,35 @@ def test_island_seed_is_stable_across_repeated_requests(client: TestClient, user
     assert first["generation_seed"] == second["generation_seed"]
     stored = db.scalar(select(Island).where(Island.user_id == created["id"]))
     assert stored is not None and stored.generation_seed == first["generation_seed"]
+
+
+def test_position_outside_island_is_not_saved(client: TestClient, users, db: Session) -> None:
+    login(client)
+    created = create_regular_user(client, "bounded-player")
+    client.post("/auth/logout")
+    login(client, "bounded-player", "temporary-password")
+    response = client.put("/game/position", json={"x": -10000, "y": -10000})
+    assert response.status_code == 422
+    island = db.scalar(select(Island).where(Island.user_id == created["id"]))
+    assert island is not None
+    assert (island.player_x, island.player_y) == (2600, 2600)
+
+
+def test_invalid_saved_position_is_restored_to_safe_spawn(client: TestClient, users, db: Session) -> None:
+    login(client)
+    created = create_regular_user(client, "restored-player")
+    island = db.scalar(select(Island).where(Island.user_id == created["id"]))
+    assert island is not None
+    island.player_x, island.player_y = -10000, -10000
+    db.commit()
+
+    client.post("/auth/logout")
+    login(client, "restored-player", "temporary-password")
+    response = client.get("/game/island")
+    assert response.status_code == 200
+    assert response.json()["player"] == {"x": 2600, "y": 2600}
+    db.refresh(island)
+    assert (island.player_x, island.player_y) == (2600, 2600)
 
 
 def test_user_and_island_creation_is_atomic(client: TestClient, users, db: Session, monkeypatch) -> None:
