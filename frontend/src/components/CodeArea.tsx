@@ -4,6 +4,7 @@ import { apiRequest } from '../api/client'
 import type { PythonRunner } from '../python/PythonRunner'
 import type { GamePythonBridge } from '../game/GamePythonBridge'
 import type { PythonRuntimeState } from '../python/pythonProtocol'
+import { bindEditorKeyboardFocus } from './editorKeyboardFocus'
 
 type CodeResponse = { code: string }
 type SaveState = 'loading' | 'saved' | 'unsaved' | 'saving'
@@ -106,8 +107,8 @@ export function CodeArea({ runner, bridge, gameOutput, isOpen, onClose, onEditor
             setError('')
           }}
           onMount={(editor) => {
-            editor.onDidFocusEditorText(() => onEditorFocusChange(true))
-            editor.onDidBlurEditorText(() => onEditorFocusChange(false))
+            const focusBinding = bindEditorKeyboardFocus(editor, onEditorFocusChange)
+            editor.onDidDispose(() => focusBinding.dispose())
           }}
           options={{ minimap: { enabled: false }, automaticLayout: true, fontSize: 14 }}
         />

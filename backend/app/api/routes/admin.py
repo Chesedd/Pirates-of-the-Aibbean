@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -24,7 +26,8 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     try:
         db.flush()
         if user.role == Role.USER:
-            db.add(Island(user_id=user.id))
+            # Stay within JavaScript's exact integer range: the frontend consumes this value as JSON.
+            db.add(Island(user_id=user.id, generation_seed=secrets.randbits(52)))
             db.add(PlayerCode(user_id=user.id))
             db.add(UserProgress(user_id=user.id))
         db.commit()
