@@ -4,11 +4,22 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import current_user
 from app.database.session import get_db
-from app.models.user import Island, PlayerCode, User
+from app.models.user import Island, PlayerCode, User, UserProgress
 from app.schemas.code import PlayerCodePayload, PlayerCodePublic
 from app.schemas.island import IslandPublic, PlayerPositionUpdate
+from app.schemas.progress import ProgressPublic
 
 router = APIRouter(prefix="/game", tags=["game"])
+
+
+@router.get("/progress", response_model=ProgressPublic)
+def get_progress(
+    user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> ProgressPublic:
+    progress = db.scalar(select(UserProgress).where(UserProgress.user_id == user.id))
+    if progress is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Progress not found")
+    return ProgressPublic(unlocks=sorted(unlock.key for unlock in progress.unlocks))
 
 
 @router.get("/island", response_model=IslandPublic)
