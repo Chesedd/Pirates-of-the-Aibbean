@@ -82,7 +82,7 @@ export function CodeArea() {
           theme="vs-dark"
           value={code}
           loading="Loading editor…"
-          onChange={(value) => {
+          onChange={(value: string | undefined) => {
             setCode(value ?? '')
             setState('unsaved')
             setError('')
