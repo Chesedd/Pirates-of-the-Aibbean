@@ -14,15 +14,15 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: .75rem; bord
 .game-page { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; background: #071a28; }
 .game-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.5rem; background: #0b2538; border-bottom: 1px solid #315369; }
 .game-header h1, .game-header p { margin: 0; }.game-header p { color: #b8cbd5; margin-top: .2rem; }
-.game-workspace { min-height: 0; display: grid; grid-template-columns: minmax(0, 3fr) minmax(22rem, 2fr); }
+.game-workspace { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.game-workspace.editor-open { grid-template-columns: minmax(0, 3fr) minmax(22rem, 2fr); }
 .game-pane { position: relative; min-width: 0; min-height: 34rem; display: grid; }
-.unlocks-panel { position: absolute; z-index: 1; top: 1rem; left: 1rem; width: 14rem; padding: .75rem; border: 1px solid #52798f; border-radius: .4rem; background: rgb(7 26 40 / 88%); font: .75rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
-.unlocks-panel h2 { margin: 0 0 .35rem; color: #f5c451; font-size: .8rem; letter-spacing: .1em; }
-.unlocks-panel div { display: flex; justify-content: space-between; gap: 1rem; color: #b8cbd5; }
-.unlocks-panel div span:last-child { color: #91adbb; }
 .game-canvas { width: 100%; min-height: 34rem; height: calc(100vh - 5.5rem); overflow: hidden; }
 .game-canvas canvas { display: block; }.game-status { align-self: center; justify-self: center; }
 .code-panel { min-width: 0; min-height: 34rem; display: grid; grid-template-rows: auto minmax(18rem, 1fr) auto minmax(7rem, auto); padding: 1rem; gap: .8rem; border-left: 1px solid #315369; background: #0b2538; }
+.code-panel[hidden] { display: none; }
+.code-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.code-panel-close { padding: .4rem .7rem; }
 .code-panel h2 { margin: 0; font: 600 1rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .code-editor { min-height: 25rem; overflow: hidden; border: 1px solid #315369; }
 .code-actions { display: flex; align-items: center; gap: 1rem; min-height: 2.8rem; }

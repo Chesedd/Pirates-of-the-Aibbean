@@ -3,7 +3,13 @@ import { IslandScene } from './scenes/IslandScene'
 import type { Island } from '../pages/UserPage'
 import type { GamePythonBridge } from './GamePythonBridge'
 
-export function createGame(parent: HTMLElement, island: Island, pythonBridge: GamePythonBridge): Phaser.Game {
+export function createGame(
+  parent: HTMLElement,
+  island: Island,
+  pythonBridge: GamePythonBridge,
+  username: string,
+  onPlayerClick: () => void,
+): Phaser.Game {
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -15,7 +21,12 @@ export function createGame(parent: HTMLElement, island: Island, pythonBridge: Ga
     },
     scene: IslandScene,
     callbacks: {
-      preBoot: (game) => { game.registry.set('island', island); game.registry.set('pythonBridge', pythonBridge) },
+      preBoot: (game) => {
+        game.registry.set('island', island)
+        game.registry.set('pythonBridge', pythonBridge)
+        game.registry.set('username', username)
+        game.registry.set('onPlayerClick', onPlayerClick)
+      },
     },
   })
 }
