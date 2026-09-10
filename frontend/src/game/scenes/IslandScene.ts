@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import type { Island } from '../../pages/UserPage'
 import type { GamePythonBridge } from '../GamePythonBridge'
+import type { SceneLifecycleCallbacks } from '../createGame'
 
 export class IslandScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Container
@@ -40,6 +41,16 @@ export class IslandScene extends Phaser.Scene {
     this.cameras.main.centerOn(centerX, centerY)
     const cursors = this.input.keyboard!.createCursorKeys()
     this.keys = { up: cursors.up, down: cursors.down, left: cursors.left, right: cursors.right }
+    const lifecycle = this.registry.get('sceneLifecycle') as SceneLifecycleCallbacks
+    lifecycle.onReady(this)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => lifecycle.onShutdown(this))
+  }
+
+  setKeyboardEnabled(enabled: boolean) {
+    const keyboard = this.input.keyboard
+    if (!keyboard) return
+    keyboard.enabled = enabled
+    if (!enabled) keyboard.resetKeys()
   }
 
   update(time: number) {
