@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -47,8 +47,9 @@ class Island(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
     )
-    player_x: Mapped[int] = mapped_column(Integer, default=400, server_default="400")
-    player_y: Mapped[int] = mapped_column(Integer, default=300, server_default="300")
+    generation_seed: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    player_x: Mapped[int] = mapped_column(Integer, default=2600, server_default="2600")
+    player_y: Mapped[int] = mapped_column(Integer, default=2600, server_default="2600")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     user: Mapped[User] = relationship(back_populates="island")
 

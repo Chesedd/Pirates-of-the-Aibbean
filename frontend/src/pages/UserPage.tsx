@@ -6,7 +6,7 @@ import { CodeArea } from '../components/CodeArea'
 import { createBrowserPythonRunner } from '../python/PythonRunner'
 import { GamePythonBridge } from '../game/GamePythonBridge'
 
-export type Island = { id: number; player: { x: number; y: number } }
+export type Island = { id: number; generation_seed: number; player: { x: number; y: number } }
 export function UserPage({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [island, setIsland] = useState<Island | null>(null)
   const [error, setError] = useState('')

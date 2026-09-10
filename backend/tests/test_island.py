@@ -22,7 +22,8 @@ def test_regular_user_creation_creates_exactly_one_island(client: TestClient, us
     created = create_regular_user(client, "islander")
     islands = list(db.scalars(select(Island).where(Island.user_id == created["id"])))
     assert len(islands) == 1
-    assert (islands[0].player_x, islands[0].player_y) == (400, 300)
+    assert (islands[0].player_x, islands[0].player_y) == (2600, 2600)
+    assert isinstance(islands[0].generation_seed, int)
 
 
 def test_admin_creation_does_not_create_island(client: TestClient, users, db: Session) -> None:
@@ -47,12 +48,14 @@ def test_users_receive_only_their_own_distinct_islands(client: TestClient, users
     second_island = db.scalar(select(Island).where(Island.user_id == second["id"]))
     assert first_island is not None and second_island is not None
     assert first_island.id != second_island.id
+    assert first_island.generation_seed != second_island.generation_seed
 
     client.post("/auth/logout")
     login(client, "firstmate", "temporary-password")
     assert client.get("/game/island").json() == {
         "id": first_island.id,
-        "player": {"x": 400, "y": 300},
+        "generation_seed": first_island.generation_seed,
+        "player": {"x": 2600, "y": 2600},
     }
     # The API exposes no island id or user id selector; query parameters cannot change ownership.
     assert client.get(f"/game/island?user_id={second['id']}&island_id={second_island.id}").json()["id"] == first_island.id
@@ -60,9 +63,9 @@ def test_users_receive_only_their_own_distinct_islands(client: TestClient, users
 
 
 def test_duplicate_island_is_rejected(users, db: Session) -> None:
-    db.add(Island(user_id=users["user"].id))
+    db.add(Island(user_id=users["user"].id, generation_seed=1))
     db.commit()
-    db.add(Island(user_id=users["user"].id))
+    db.add(Island(user_id=users["user"].id, generation_seed=2))
     with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
@@ -81,7 +84,19 @@ def test_user_can_update_only_their_own_position(client: TestClient, users, db: 
     db.refresh(owner_island)
     db.refresh(other_island)
     assert (owner_island.player_x, owner_island.player_y) == (123, 234)
-    assert (other_island.player_x, other_island.player_y) == (400, 300)
+    assert (other_island.player_x, other_island.player_y) == (2600, 2600)
+
+
+def test_island_seed_is_stable_across_repeated_requests(client: TestClient, users, db: Session) -> None:
+    login(client)
+    created = create_regular_user(client, "seeded-player")
+    client.post("/auth/logout")
+    login(client, "seeded-player", "temporary-password")
+    first = client.get("/game/island").json()
+    second = client.get("/game/island").json()
+    assert first["generation_seed"] == second["generation_seed"]
+    stored = db.scalar(select(Island).where(Island.user_id == created["id"]))
+    assert stored is not None and stored.generation_seed == first["generation_seed"]
 
 
 def test_user_and_island_creation_is_atomic(client: TestClient, users, db: Session, monkeypatch) -> None:

@@ -2,6 +2,8 @@ import Phaser from 'phaser'
 import type { Island } from '../../pages/UserPage'
 import type { GamePythonBridge } from '../GamePythonBridge'
 import type { SceneLifecycleCallbacks } from '../createGame'
+import { createDirectionKeys } from '../gameKeyboard'
+import { configureIslandCamera, generateIslandGeometry, ISLAND_CENTER } from '../islandGeometry'
 
 export class IslandScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Container
@@ -14,15 +16,18 @@ export class IslandScene extends Phaser.Scene {
 
   create() {
     const island = this.registry.get('island') as Island
-    const centerX = 400
-    const centerY = 300
+    const coastline = generateIslandGeometry(island.generation_seed)
 
     this.cameras.main.setBackgroundColor(0x176b87)
     const graphics = this.add.graphics()
-    graphics.fillStyle(0xe7c66b).fillEllipse(centerX, centerY, 1120, 680)
-    graphics.fillStyle(0x4b9b58).fillEllipse(centerX, centerY - 18, 1020, 590)
-    graphics.fillStyle(0x397d49).fillCircle(centerX - 300, centerY - 145, 72)
-    graphics.fillCircle(centerX + 325, centerY + 115, 65)
+    graphics.fillStyle(0xe7c66b)
+    graphics.fillPoints(coastline, true)
+    const interior = coastline.map(({ x, y }) => ({
+      x: ISLAND_CENTER + (x - ISLAND_CENTER) * 0.965,
+      y: ISLAND_CENTER + (y - ISLAND_CENTER) * 0.965,
+    }))
+    graphics.fillStyle(0x4b9b58)
+    graphics.fillPoints(interior, true)
 
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
     const body = this.add.circle(0, 0, 17, 0xf4e4c1).setStrokeStyle(5, 0x7a352c)
@@ -38,9 +43,8 @@ export class IslandScene extends Phaser.Scene {
       .setSize(Math.max(54, name.width + 12), 66)
       .setInteractive({ useHandCursor: true })
     this.player.on('pointerup', () => (this.registry.get('onPlayerClick') as () => void)())
-    this.cameras.main.centerOn(centerX, centerY)
-    const cursors = this.input.keyboard!.createCursorKeys()
-    this.keys = { up: cursors.up, down: cursors.down, left: cursors.left, right: cursors.right }
+    configureIslandCamera(this.cameras.main, this.player)
+    this.keys = createDirectionKeys(this.input.keyboard!)
     const lifecycle = this.registry.get('sceneLifecycle') as SceneLifecycleCallbacks
     lifecycle.onReady(this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => lifecycle.onShutdown(this))
