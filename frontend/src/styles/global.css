@@ -11,3 +11,8 @@ input, select { width: 100%; padding: .7rem; border: 1px solid #52798f; border-r
 .admin-grid { display: grid; grid-template-columns: 2fr 1fr; align-items: start; gap: 1.5rem; }.admin-grid .card { width: 100%; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; } th, td { padding: .75rem; border-bottom: 1px solid #315369; text-align: left; }
 @media (max-width: 700px) { .admin-grid { grid-template-columns: 1fr; }.admin-shell header { align-items: start; } }
+.game-page { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; background: #071a28; }
+.game-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.5rem; background: #0b2538; border-bottom: 1px solid #315369; }
+.game-header h1, .game-header p { margin: 0; }.game-header p { color: #b8cbd5; margin-top: .2rem; }
+.game-canvas { width: 100%; min-height: 34rem; height: calc(100vh - 5.5rem); overflow: hidden; }
+.game-canvas canvas { display: block; }.game-status { align-self: center; justify-self: center; }

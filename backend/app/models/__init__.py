@@ -1,3 +1,3 @@
-from app.models.user import Role, User, UserSession
+from app.models.user import Island, Role, User, UserSession
 
-__all__ = ["Role", "User", "UserSession"]
+__all__ = ["Island", "Role", "User", "UserSession"]
