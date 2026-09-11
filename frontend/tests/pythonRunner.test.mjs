@@ -73,6 +73,28 @@ test('retry is ignored unless initialization has failed', () => {
   runner.dispose()
 })
 
+test('initialization times out instead of remaining in loading state', async () => {
+  const workers = []
+  const originalConsoleError = console.error
+  console.error = () => {}
+  const runner = new PythonRunner(() => {
+    const worker = new MockWorker()
+    workers.push(worker)
+    return worker
+  }, 100, 10)
+
+  try {
+    assert.equal(runner.runtimeState, 'loading')
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    assert.equal(runner.runtimeState, 'error')
+    assert.equal(runner.runtimeError, 'Python initialization timed out.')
+    assert.equal(workers[0].terminated, true)
+  } finally {
+    console.error = originalConsoleError
+    runner.dispose()
+  }
+})
+
 test('resolves a successful result and stdout', async () => {
   const { runner, workers } = setup()
   const execution = runner.run('print("Hello")\n2 + 3')
