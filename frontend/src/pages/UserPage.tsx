@@ -53,6 +53,10 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
 
   const openEditor = useCallback(() => setIsEditorOpen(true), [])
   const openJournal = useCallback(() => setJournalOpen(true), [])
+  const finishTutorial = useCallback(() => {
+    setJournalOpen(false)
+    void apiRequest<Progress>('/game/progress').then(setProgress).catch((reason: Error) => setError(reason.message))
+  }, [])
 
   return <main className="game-page">
     <header className="game-header">
@@ -72,7 +76,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
           movementUnlocked={movementUnlocked}
           onJournalClick={openJournal}
         />}
-        {journalOpen && tutorial && <TutorialJournal initialState={tutorial} onClose={() => setJournalOpen(false)} onProgress={setTutorial} />}
+        {journalOpen && tutorial && <TutorialJournal initialState={tutorial} onClose={() => setJournalOpen(false)} onProgress={setTutorial} onFinished={finishTutorial} />}
       </div>
       {runtime ? <CodeArea
         runner={runtime.runner}
