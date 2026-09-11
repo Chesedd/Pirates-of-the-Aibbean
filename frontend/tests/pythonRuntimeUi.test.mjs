@@ -40,7 +40,8 @@ test('the editor disables expensive Monaco features and exposes development diag
 
 test('development switches isolate editor, scene, renderer, island, UI, and automatic layout', () => {
   for (const query of ['disableEditor', 'minimalEditor', 'disableCanvas', 'editorOnly', 'disableAutomaticLayout',
-    'disableRendering', 'disableScene', 'staticIsland']) {
+    'disableRendering', 'disablePhaserRenderer', 'hideAllGameObjects', 'hideIsland', 'hidePlayer',
+    'disableCameraFollow', 'disableWebGLPostFX', 'rendererRestartExperiment', 'disableScene', 'staticIsland']) {
     assert.match(diagnostics, new RegExp(`query\\.get\\('${query}'\\)`))
   }
   assert.match(codeArea, /<textarea className="plain-code-editor" defaultValue=\{initialCode\}/)
@@ -62,4 +63,14 @@ test('Phaser diagnostics expose update, render, FPS, long-frame, frame-work, and
   for (const mark of ['phaser-update-start', 'phaser-update-end', 'draw-island-start', 'draw-island-end']) {
     assert.match(diagnostics + islandScene, new RegExp(mark))
   }
+})
+
+test('Phaser isolation overlay exposes renderer, objects, draw calls, canvas, alpha, and input latency', () => {
+  for (const label of ['Renderer:', 'Objects:', 'Draw calls:', 'Input latency:', 'Canvas:', 'CSS:', 'Alpha:', 'Calls:']) {
+    assert.match(diagnostics, new RegExp(label))
+  }
+  for (const operation of ['Graphics.clear', 'Graphics.fillPath', 'Graphics.strokePath', 'setPosition', 'setText', 'setScale']) {
+    assert.match(diagnostics, new RegExp(operation.replace('.', '\\.')))
+  }
+  assert.match(diagnostics, /window\.setTimeout[\s\S]*3000/)
 })

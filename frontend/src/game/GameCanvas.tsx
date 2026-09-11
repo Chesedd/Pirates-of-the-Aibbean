@@ -4,7 +4,7 @@ import { createGame } from './createGame'
 import type { Island } from '../pages/UserPage'
 import type { GamePythonBridge } from './GamePythonBridge'
 import { GameSceneLifecycle } from './GameSceneLifecycle'
-import { devCount, devDiagnosticsEnabled, installPhaserDiagnostics } from '../devDiagnostics'
+import { devCount, devDiagnosticsEnabled, installPhaserDiagnostics, type PhaserDiagnostics } from '../devDiagnostics'
 
 type GameCanvasProps = {
   island: Island
@@ -13,15 +13,17 @@ type GameCanvasProps = {
   keyboardEnabled: boolean
   onPlayerClick: () => void
   movementUnlocked: boolean
+  editorOpen: boolean
   onJournalClick: () => void
 }
 
-export const GameCanvas = memo(function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick, movementUnlocked, onJournalClick }: GameCanvasProps) {
+export const GameCanvas = memo(function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick, movementUnlocked, editorOpen, onJournalClick }: GameCanvasProps) {
   const renderCount = useRef(0)
   if (devDiagnosticsEnabled) devCount('GameCanvas container render', ++renderCount.current)
   const containerRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const lifecycleRef = useRef<GameSceneLifecycle | null>(null)
+  const diagnosticsRef = useRef<PhaserDiagnostics | null>(null)
   const keyboardEnabledRef = useRef(keyboardEnabled)
   keyboardEnabledRef.current = keyboardEnabled
 
@@ -35,18 +37,22 @@ export const GameCanvas = memo(function GameCanvas({ island, bridge, username, k
       onShutdown: (scene) => lifecycle.sceneShutdown(scene),
     })
     gameRef.current = game
-    const removeDiagnostics = installPhaserDiagnostics(game, containerRef.current)
+    const diagnostics = installPhaserDiagnostics(game, containerRef.current)
+    diagnosticsRef.current = diagnostics
     let cleanedUp = false
     return () => {
       if (cleanedUp) return
       cleanedUp = true
       lifecycle.dispose()
-      removeDiagnostics()
+      diagnostics.dispose()
+      if (diagnosticsRef.current === diagnostics) diagnosticsRef.current = null
       if (lifecycleRef.current === lifecycle) lifecycleRef.current = null
       if (gameRef.current === game) gameRef.current = null
       game.destroy(true)
     }
   }, [island, bridge, username, onPlayerClick, movementUnlocked, onJournalClick])
+
+  useEffect(() => diagnosticsRef.current?.setEditorOpen(editorOpen), [editorOpen])
 
   useEffect(() => {
     lifecycleRef.current?.setKeyboardEnabled(keyboardEnabled)

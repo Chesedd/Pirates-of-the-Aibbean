@@ -21,6 +21,7 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: .75rem; bord
 .game-canvas canvas { display: block; }.game-status { align-self: center; justify-self: center; }
 .game-canvas { position: relative; }
 .phaser-diagnostics { position: absolute; z-index: 4; top: .7rem; left: .7rem; padding: .5rem .65rem; white-space: pre; border-radius: .3rem; color: #d8f3dc; background: rgb(0 0 0 / 82%); font: 11px/1.45 ui-monospace, monospace; pointer-events: none; }
+.phaser-diagnostics::after { content: attr(data-experiment); display: block; color: #ffe08a; }
 .journal-backdrop { position:absolute; inset:0; z-index:5; display:grid; place-items:center; padding:3.5rem 1rem 1rem; background:rgb(3 9 13 / 78%); backdrop-filter:blur(4px) }
 .journal-shell { position:relative; width:min(73rem,96%); color:#322316 }
 .journal-book { position:relative; min-height:min(42rem,84vh); padding:1.3rem 2rem 2rem; overflow:hidden; border:.7rem solid #59331f; border-width:.7rem 1rem 1rem; border-radius:1.3rem 1.3rem 2.2rem 2.2rem; background:#ead49f; box-shadow:0 2rem 5rem rgb(0 0 0 / 70%),inset 0 0 0 2px #94643b }
