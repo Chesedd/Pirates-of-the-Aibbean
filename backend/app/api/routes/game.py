@@ -5,12 +5,61 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import current_user
 from app.database.session import get_db
 from app.game.island_geometry import SAFE_SPAWN, position_is_on_island
-from app.models.user import Island, PlayerCode, User, UserProgress
+from app.models.user import Island, PlayerCode, User, UserProgress, UserUnlock
 from app.schemas.code import PlayerCodePayload, PlayerCodePublic
 from app.schemas.island import IslandPublic, PlayerPositionUpdate
 from app.schemas.progress import ProgressPublic
+from app.schemas.tutorial import TutorialResult, TutorialState, TutorialSubmission
+from app.services.tutorial import EXPECTED_OUTPUT, TutorialCodeError, run_tutorial_code
 
 router = APIRouter(prefix="/game", tags=["game"])
+
+TUTORIAL_KEYS = ("tutorial_linear_1", "tutorial_linear_2")
+
+
+def _tutorial_state(progress: UserProgress) -> TutorialState:
+    keys = {unlock.key for unlock in progress.unlocks}
+    completed = [number for number, key in enumerate(TUTORIAL_KEYS, 1) if key in keys]
+    current_task = next((number for number in (1, 2) if number not in completed), None)
+    return TutorialState(current_task=current_task, completed=completed)
+
+
+@router.get("/tutorial", response_model=TutorialState)
+def get_tutorial(user: User = Depends(current_user), db: Session = Depends(get_db)) -> TutorialState:
+    progress = db.scalar(select(UserProgress).where(UserProgress.user_id == user.id))
+    if progress is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Progress not found")
+    return _tutorial_state(progress)
+
+
+@router.post("/tutorial/check", response_model=TutorialResult)
+def check_tutorial(
+    payload: TutorialSubmission,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> TutorialResult:
+    progress = db.scalar(select(UserProgress).where(UserProgress.user_id == user.id))
+    if progress is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Progress not found")
+    state = _tutorial_state(progress)
+    if payload.task not in (1, 2) or payload.task != state.current_task:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Complete tutorial tasks in order")
+    try:
+        output = run_tutorial_code(payload.code)
+    except TutorialCodeError as exc:
+        return TutorialResult(**state.model_dump(), correct=False, output="", error=str(exc))
+    correct = output == EXPECTED_OUTPUT[payload.task]
+    if correct:
+        db.add(UserUnlock(progress_id=progress.id, key=TUTORIAL_KEYS[payload.task - 1]))
+        db.commit()
+        db.refresh(progress)
+        state = _tutorial_state(progress)
+    return TutorialResult(
+        **state.model_dump(),
+        correct=correct,
+        output=output,
+        error=None if correct else "Результат пока не совпадает с ожидаемым.",
+    )
 
 
 @router.get("/progress", response_model=ProgressPublic)

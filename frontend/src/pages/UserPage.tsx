@@ -5,6 +5,7 @@ import { GameCanvas } from '../game/GameCanvas'
 import { CodeArea } from '../components/CodeArea'
 import { createBrowserPythonRunner } from '../python/PythonRunner'
 import { GamePythonBridge } from '../game/GamePythonBridge'
+import { TutorialJournal, type TutorialState } from '../components/TutorialJournal'
 
 export type Island = { id: number; generation_seed: number; player: { x: number; y: number } }
 export type Progress = { unlocks: string[] }
@@ -19,6 +20,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [isEditorFocused, setIsEditorFocused] = useState(false)
   const [runtime, setRuntime] = useState<PythonRuntime | null>(null)
+  const [tutorial, setTutorial] = useState<TutorialState | null>(null)
 
   useEffect(() => {
     const runner = createBrowserPythonRunner()
@@ -38,10 +40,11 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
   }, [])
 
   useEffect(() => {
-    Promise.all([apiRequest<Island>('/game/island'), apiRequest<Progress>('/game/progress')])
-      .then(([loadedIsland, loadedProgress]) => {
+    Promise.all([apiRequest<Island>('/game/island'), apiRequest<Progress>('/game/progress'), apiRequest<TutorialState>('/game/tutorial')])
+      .then(([loadedIsland, loadedProgress, loadedTutorial]) => {
         setIsland(loadedIsland)
         setProgress(loadedProgress)
+        setTutorial(loadedTutorial)
       }).catch((reason: Error) => setError(reason.message))
   }, [])
 
@@ -69,13 +72,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
           movementUnlocked={movementUnlocked}
           onJournalClick={openJournal}
         />}
-        {journalOpen && <div className="journal-backdrop" role="presentation" onClick={() => setJournalOpen(false)}>
-          <section className="journal-dialog" role="dialog" aria-modal="true" aria-labelledby="journal-title" onClick={(event) => event.stopPropagation()}>
-            <h2 id="journal-title">Судовой журнал</h2>
-            <p>Записи сильно пострадали после кораблекрушения.</p>
-            <button type="button" onClick={() => setJournalOpen(false)}>Закрыть</button>
-          </section>
-        </div>}
+        {journalOpen && tutorial && <TutorialJournal initialState={tutorial} onClose={() => setJournalOpen(false)} onProgress={setTutorial} />}
       </div>
       {runtime ? <CodeArea
         runner={runtime.runner}

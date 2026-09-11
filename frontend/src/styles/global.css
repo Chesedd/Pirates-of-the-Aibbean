@@ -19,9 +19,12 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: .75rem; bord
 .game-pane { position: relative; min-width: 0; min-height: 34rem; display: grid; }
 .game-canvas { width: 100%; min-height: 34rem; height: calc(100vh - 5.5rem); overflow: hidden; }
 .game-canvas canvas { display: block; }.game-status { align-self: center; justify-self: center; }
-.journal-backdrop { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 1rem; background: rgb(3 12 18 / 65%); }
-.journal-dialog { width: min(28rem, 100%); padding: 2rem; border: 2px solid #8b5a2b; border-radius: .6rem; color: #2e2115; background: #e8d3a2; box-shadow: 0 1rem 3rem rgb(0 0 0 / 55%); }
-.journal-dialog h2 { margin-top: 0; }.journal-dialog button { float: right; }
+.journal-backdrop { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 1rem; background: rgb(3 12 18 / 72%); backdrop-filter: blur(2px); }
+.journal-dialog { width: min(70rem, 96%); min-height: min(40rem, 90vh); padding: 1.4rem 2rem 2rem; border: 2px solid #75451f; border-radius: .8rem; color: #302116; background: #e6cc91; background-image: linear-gradient(90deg, #dcc083 0, #f0dcaa 48%, #b79457 50%, #eed7a3 52%, #e1c487 100%); box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 65%); }
+.journal-heading { position: relative; text-align: center; text-transform: uppercase; letter-spacing: .12em; }.journal-heading h2 { margin: .2rem 0 1.2rem; font-family: Georgia, serif; }.journal-close { position: absolute; top: -.5rem; right: 0; padding: .2rem .65rem; color: #50351e; background: transparent; font-size: 1.8rem; }
+.journal-spread { display: grid; grid-template-columns: 1fr 1fr; min-height: 31rem; transition: opacity .35s, transform .35s; }.journal-spread.journal-success { opacity: .55; transform: scale(.99); }
+.journal-page { padding: 1.5rem 3rem; }.journal-story { border-right: 1px solid rgb(85 52 25 / 28%); font: 1.05rem/1.55 Georgia, serif; }.journal-story h3 { margin: .25rem 0 1.4rem; font-size: 1.65rem; }.journal-entry { margin: 0; color: #80623e; font-size: .8rem; text-transform: uppercase; letter-spacing: .1em; }.journal-expected { padding-top: .7rem; border-top: 1px solid #b99a64; font-weight: 700; }
+.journal-work { display: grid; grid-template-rows: auto minmax(15rem, 1fr) auto minmax(3rem, auto); gap: .7rem; }.journal-work label { margin: 0; color: #60452d; font: 700 .85rem ui-monospace, monospace; }.tutorial-editor { width: 100%; resize: none; padding: 1rem; border: 1px solid #80613e; border-radius: .35rem; color: #eee9dc; background: #20272a; box-shadow: inset 0 .2rem .7rem rgb(0 0 0 / 30%); font: .95rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; tab-size: 4; }.journal-work button { justify-self: center; min-width: 9rem; }.tutorial-result { padding: .7rem; border: 1px solid rgb(93 64 35 / 32%); color: #54351e; background: rgb(255 248 218 / 35%); font: 700 .9rem/1.4 ui-monospace, monospace; white-space: pre-wrap; }.journal-finale { display: grid; min-height: 28rem; place-content: center; text-align: center; font: 1.25rem/1.8 Georgia, serif; }
 .code-panel { min-width: 0; min-height: 34rem; display: grid; grid-template-rows: auto minmax(18rem, 1fr) auto minmax(7rem, auto); padding: 1rem; gap: .8rem; border-left: 1px solid #315369; background: #0b2538; }
 .code-panel[hidden] { display: none; }
 .code-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
@@ -38,4 +41,5 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: .75rem; bord
   .game-workspace { grid-template-columns: 1fr; }
   .game-canvas { height: 34rem; }
   .code-panel { border-left: 0; border-top: 1px solid #315369; }
+  .journal-dialog { max-height: 94vh; overflow: auto; padding-inline: 1rem; }.journal-spread { grid-template-columns: 1fr; }.journal-page { padding: 1rem; }.journal-story { border-right: 0; border-bottom: 1px solid rgb(85 52 25 / 28%); }
 }
