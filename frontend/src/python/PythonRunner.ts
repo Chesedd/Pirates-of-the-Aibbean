@@ -7,6 +7,7 @@ import type {
   PythonWorkerRequest,
   PythonWorkerResponse,
 } from './pythonProtocol.js'
+import { DevTiming, devCount, devDiagnosticsEnabled } from '../devDiagnostics.js'
 
 export interface WorkerLike {
   onmessage: ((event: MessageEvent<PythonWorkerResponse>) => void) | null
@@ -36,6 +37,7 @@ type PendingRun = {
   resolve: (result: PythonRunResult | PythonTickResult | void) => void
   reject: (reason: Error) => void
   timer: ReturnType<typeof setTimeout>
+  started: number
 }
 type WorkerRequestWithoutId = PythonWorkerRequest extends infer Request
   ? Request extends { runId: number } ? Omit<Request, 'runId'> : never
@@ -49,6 +51,9 @@ export class PythonRunner {
   private initializationError = ''
   private initializationTimer: ReturnType<typeof setTimeout> | null = null
   private listeners = new Set<(state: PythonRuntimeState) => void>()
+  private workerRequestCount = 0
+  private workerMessageCount = 0
+  private readonly workerResponseTiming = new DevTiming('worker response')
 
   constructor(
     private readonly createWorker: WorkerFactory,
@@ -105,10 +110,8 @@ export class PythonRunner {
         this.rejectPending(new ExecutionTimeoutError())
         this.restartWorker()
       }, this.timeoutMs)
-      this.pending = { id, resolve: resolve as PendingRun['resolve'], reject, timer }
-      if ((import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) {
-        console.debug(`[PythonRunner] worker message #${id}: ${request.type}`)
-      }
+      this.pending = { id, resolve: resolve as PendingRun['resolve'], reject, timer, started: performance.now() }
+      if (devDiagnosticsEnabled) devCount(`worker request (${request.type})`, ++this.workerRequestCount)
       this.worker?.postMessage({ ...request, runId: id } as PythonWorkerRequest)
     })
   }
@@ -141,6 +144,7 @@ export class PythonRunner {
   private handleMessage(worker: WorkerLike, message: PythonWorkerResponse) {
     // A terminated worker can still have an already queued event. Ignore it.
     if (worker !== this.worker) return
+    if (devDiagnosticsEnabled) devCount(`worker message (${message.type})`, ++this.workerMessageCount)
     if (message.type === 'ready') {
       this.clearInitializationTimer()
       this.setState('ready')
@@ -154,6 +158,7 @@ export class PythonRunner {
     if (!this.pending || message.runId !== this.pending.id) return
 
     const pending = this.pending
+    if (devDiagnosticsEnabled) this.workerResponseTiming.add(performance.now() - pending.started)
     this.pending = null
     clearTimeout(pending.timer)
     if (message.type === 'result') {
