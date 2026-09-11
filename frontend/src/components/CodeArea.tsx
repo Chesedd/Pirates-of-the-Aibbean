@@ -128,9 +128,14 @@ export function CodeArea({ runner, bridge, gameOutput, isOpen, onClose, onEditor
         <span className={`save-status ${error ? 'error' : ''}`} aria-live="polite">
           {error || status}
         </span>
-        <span className="python-status" aria-live="polite">
-          {runtimeState === 'loading' ? 'Loading Python…' : 'Python ready'}
+        <span className={`python-status ${runtimeState === 'error' ? 'error' : ''}`} aria-live="polite">
+          {runtimeState === 'loading' && 'Loading Python…'}
+          {runtimeState === 'ready' && 'Python ready'}
+          {runtimeState === 'error' && <>Python failed to load: {runner.runtimeError}</>}
         </span>
+        {runtimeState === 'error' && <button className="secondary" type="button" onClick={() => runner.retry()}>
+          Retry
+        </button>}
       </div>
       <section className="output-panel" aria-labelledby="output-title">
         <h3 id="output-title">OUTPUT</h3>

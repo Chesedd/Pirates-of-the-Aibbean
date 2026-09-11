@@ -16,4 +16,4 @@ export type PythonWorkerResponse =
 
 export type PythonRunResult = { stdout: string; result: string }
 export type PythonTickResult = { x: unknown; y: unknown; stdout: string }
-export type PythonRuntimeState = 'loading' | 'ready'
+export type PythonRuntimeState = 'loading' | 'ready' | 'error'
