@@ -47,11 +47,13 @@ export class PythonRunner {
   private nextId = 1
   private state: PythonRuntimeState = 'loading'
   private initializationError = ''
+  private initializationTimer: ReturnType<typeof setTimeout> | null = null
   private listeners = new Set<(state: PythonRuntimeState) => void>()
 
   constructor(
     private readonly createWorker: WorkerFactory,
     private readonly timeoutMs = 5_000,
+    private readonly initializationTimeoutMs = 20_000,
   ) {
     this.startWorker()
   }
@@ -109,6 +111,7 @@ export class PythonRunner {
   }
 
   dispose() {
+    this.clearInitializationTimer()
     this.rejectPending(new Error('Python runner disposed.'))
     this.worker?.terminate()
     this.worker = null
@@ -127,12 +130,16 @@ export class PythonRunner {
       if (this.state === 'loading') this.failInitialization(worker, error.message)
       else this.restartWorker()
     }
+    this.initializationTimer = setTimeout(() => {
+      this.failInitialization(worker, 'Python initialization timed out.')
+    }, this.initializationTimeoutMs)
   }
 
   private handleMessage(worker: WorkerLike, message: PythonWorkerResponse) {
     // A terminated worker can still have an already queued event. Ignore it.
     if (worker !== this.worker) return
     if (message.type === 'ready') {
+      this.clearInitializationTimer()
       this.setState('ready')
       return
     }
@@ -176,11 +183,18 @@ export class PythonRunner {
 
   private failInitialization(worker: WorkerLike, reason: string) {
     if (worker !== this.worker) return
+    this.clearInitializationTimer()
     this.initializationError = reason
     console.error(`Python failed to load: ${reason}`)
     worker.terminate()
     this.worker = null
     this.setState('error')
+  }
+
+  private clearInitializationTimer() {
+    if (this.initializationTimer === null) return
+    clearTimeout(this.initializationTimer)
+    this.initializationTimer = null
   }
 
   private setState(state: PythonRuntimeState) {
