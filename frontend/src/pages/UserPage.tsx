@@ -18,7 +18,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
   const [journalOpen, setJournalOpen] = useState(false)
   const [error, setError] = useState('')
   const [output, setOutput] = useState('')
-  const [isEditorOpen, setIsEditorOpen] = useState(false)
+  const [isEditorOpen, setIsEditorOpen] = useState(debugSwitches.editorOnly)
   const [isEditorFocused, setIsEditorFocused] = useState(false)
   const [runtime, setRuntime] = useState<PythonRuntime | null>(null)
   const [tutorial, setTutorial] = useState<TutorialState | null>(null)
@@ -42,6 +42,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
   }, [])
 
   useEffect(() => {
+    if (debugSwitches.editorOnly) return
     Promise.all([apiRequest<Island>('/game/island'), apiRequest<Progress>('/game/progress'), apiRequest<TutorialState>('/game/tutorial')])
       .then(([loadedIsland, loadedProgress, loadedTutorial]) => {
         setIsland(loadedIsland)
@@ -68,16 +69,16 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
     void apiRequest<Progress>('/game/progress').then(setProgress).catch((reason: Error) => setError(reason.message))
   }, [])
 
-  return <main className="game-page">
-    <header className="game-header">
+  return <main className={`game-page ${debugSwitches.editorOnly ? 'editor-only' : ''}`}>
+    {!debugSwitches.editorOnly && <header className="game-header">
       <div><h1>{movementUnlocked ? 'Your island' : 'Разбитый корабль'}</h1><p>Captain <strong>{user.username}</strong></p></div>
       <button className="secondary" onClick={onLogout}>Logout</button>
-    </header>
+    </header>}
     <div className={`game-workspace ${isEditorOpen ? 'editor-open' : ''}`}>
-      <div className="game-pane">
+      {!debugSwitches.editorOnly && <div className="game-pane">
         {error && <p className="error game-status">Could not load the island: {error}</p>}
         {!error && (!island || !progress) && <p className="game-status">Charting your course…</p>}
-        {island && progress && runtime && <GameCanvas
+        {island && progress && runtime && !debugSwitches.disableCanvas && <GameCanvas
           island={island}
           bridge={runtime.bridge}
           username={user.username}
@@ -87,7 +88,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
           onJournalClick={openJournal}
         />}
         {journalOpen && tutorial && <TutorialJournal initialState={tutorial} onClose={closeJournal} onProgress={setTutorial} onFinished={finishTutorial} onEditorFocusChange={setIsEditorFocused} />}
-      </div>
+      </div>}
       {runtime ? <CodeArea
         runner={runtime.runner}
         bridge={runtime.bridge}

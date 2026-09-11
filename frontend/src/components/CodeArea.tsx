@@ -5,7 +5,7 @@ import type { PythonRunner } from '../python/PythonRunner'
 import type { GamePythonBridge } from '../game/GamePythonBridge'
 import type { PythonRuntimeState } from '../python/pythonProtocol'
 import { bindEditorKeyboardFocus } from './editorKeyboardFocus'
-import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled } from '../devDiagnostics'
+import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, installInputLatencyProbe, type EditorDiagnosticMode } from '../devDiagnostics'
 
 type CodeResponse = { code: string }
 type SaveState = 'loading' | 'saved' | 'unsaved' | 'saving'
@@ -35,7 +35,7 @@ const CodeEditor = memo(function CodeEditor({ initialCode, editorRef, onChange, 
     suggestOnTriggerCharacters: false,
     parameterHints: { enabled: false },
     inlineSuggest: { enabled: false },
-    automaticLayout: true,
+    automaticLayout: !debugSwitches.disableAutomaticLayout,
     fontSize: 14,
     lineNumbers: 'on' as const,
     insertSpaces: true,
@@ -58,7 +58,13 @@ const CodeEditor = memo(function CodeEditor({ initialCode, editorRef, onChange, 
   />
 })
 
+// Deliberately inert: no language, options, callbacks, refs, hooks, or value prop.
+function MinimalCodeEditor({ initialCode }: { initialCode: string }) {
+  return <Editor theme="vs-dark" defaultValue={initialCode} loading="Loading minimal editor…" />
+}
+
 export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isOpen, onClose, onEditorFocusChange }: CodeAreaProps) {
+  const editorHostRef = useRef<HTMLDivElement | null>(null)
   const editorRef = useRef<MonacoEditor | null>(null)
   const statusRef = useRef<HTMLSpanElement | null>(null)
   const saveStateRef = useRef<SaveState>('loading')
@@ -98,6 +104,12 @@ export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isO
       })
   }, [])
 
+  useEffect(() => {
+    if (!isOpen || !editorHostRef.current) return
+    const mode: EditorDiagnosticMode = debugSwitches.disableEditor ? 'textarea' : debugSwitches.minimalEditor ? 'minimal Monaco' : 'full Monaco'
+    return installInputLatencyProbe(editorHostRef.current, mode)
+  }, [isOpen])
+
   const handleEditorChange = useCallback(() => {
     const started = devDiagnosticsEnabled ? performance.now() : 0
     // Keep keystrokes entirely inside Monaco: refs and this DOM label do not render React.
@@ -126,7 +138,10 @@ export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isO
     })
   }, [onEditorFocusChange])
 
-  const readCode = useCallback(() => editorRef.current?.getValue() ?? initialCode ?? '', [initialCode])
+  const readCode = useCallback(() => editorRef.current?.getValue()
+    ?? editorHostRef.current?.querySelector('textarea')?.value
+    ?? initialCode
+    ?? '', [initialCode])
 
   const save = useCallback(async () => {
     saveStateRef.current = 'saving'
@@ -172,14 +187,18 @@ export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isO
   const displayedError = displayedState === 'unsaved' ? '' : error
 
   return <section className="code-panel" aria-labelledby="code-title" hidden={!isOpen}>
-    <div className="code-panel-header">
+    {!debugSwitches.editorOnly && <div className="code-panel-header">
       <h2 id="code-title">player.py</h2>
       <button className="code-panel-close secondary" type="button" onClick={onClose} aria-label="Close player.py editor">Close</button>
+    </div>}
+    <div className="code-editor" ref={editorHostRef}>
+      {initialCode !== null && (debugSwitches.disableEditor
+        ? <textarea className="plain-code-editor" defaultValue={initialCode} aria-label="player.py plain text editor" />
+        : debugSwitches.minimalEditor
+          ? <MinimalCodeEditor initialCode={initialCode} />
+          : <CodeEditor initialCode={initialCode} editorRef={editorRef} onChange={handleEditorChange} onMount={handleMount} />)}
     </div>
-    <div className="code-editor">
-      {initialCode !== null && <CodeEditor initialCode={initialCode} editorRef={editorRef} onChange={handleEditorChange} onMount={handleMount} />}
-    </div>
-    <div className="code-actions">
+    {!debugSwitches.editorOnly && <div className="code-actions">
       <button onClick={save} disabled={state === 'loading' || state === 'saving'}>Save</button>
       <button className="secondary" onClick={run} disabled={runtimeState !== 'ready' || isRunning}>{isRunning ? 'Running…' : 'Run'}</button>
       <button className="secondary" onClick={apply} disabled={runtimeState !== 'ready' || isRunning}>Apply</button>
@@ -190,7 +209,7 @@ export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isO
         {runtimeState === 'error' && <>Python failed to load: {runner.runtimeError}</>}
       </span>
       {runtimeState === 'error' && <button className="secondary" type="button" onClick={() => runner.retry()}>Retry</button>}
-    </div>
-    <section className="output-panel" aria-labelledby="output-title"><h3 id="output-title">OUTPUT</h3><pre aria-live="polite">{gameOutput || output}</pre></section>
+    </div>}
+    {!debugSwitches.editorOnly && <section className="output-panel" aria-labelledby="output-title"><h3 id="output-title">OUTPUT</h3><pre aria-live="polite">{gameOutput || output}</pre></section>}
   </section>
 })
