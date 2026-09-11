@@ -106,6 +106,9 @@ export class PythonRunner {
         this.restartWorker()
       }, this.timeoutMs)
       this.pending = { id, resolve: resolve as PendingRun['resolve'], reject, timer }
+      if ((import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) {
+        console.debug(`[PythonRunner] worker message #${id}: ${request.type}`)
+      }
       this.worker?.postMessage({ ...request, runId: id } as PythonWorkerRequest)
     })
   }

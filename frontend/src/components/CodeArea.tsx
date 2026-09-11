@@ -1,5 +1,5 @@
-import Editor from '@monaco-editor/react'
-import { useEffect, useState } from 'react'
+import Editor, { type OnMount } from '@monaco-editor/react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiRequest } from '../api/client'
 import type { PythonRunner } from '../python/PythonRunner'
 import type { GamePythonBridge } from '../game/GamePythonBridge'
@@ -8,6 +8,7 @@ import { bindEditorKeyboardFocus } from './editorKeyboardFocus'
 
 type CodeResponse = { code: string }
 type SaveState = 'loading' | 'saved' | 'unsaved' | 'saving'
+type MonacoEditor = Parameters<OnMount>[0]
 
 type CodeAreaProps = {
   runner: PythonRunner
@@ -18,13 +19,58 @@ type CodeAreaProps = {
   onEditorFocusChange: (focused: boolean) => void
 }
 
-export function CodeArea({ runner, bridge, gameOutput, isOpen, onClose, onEditorFocusChange }: CodeAreaProps) {
-  const [code, setCode] = useState('')
+const CodeEditor = memo(function CodeEditor({ initialCode, editorRef, onChange, onMount }: {
+  initialCode: string
+  editorRef: React.MutableRefObject<MonacoEditor | null>
+  onChange: () => void
+  onMount: OnMount
+}) {
+  const options = useMemo(() => ({
+    minimap: { enabled: false },
+    codeLens: false,
+    quickSuggestions: false,
+    suggestOnTriggerCharacters: false,
+    parameterHints: { enabled: false },
+    inlineSuggest: { enabled: false },
+    automaticLayout: true,
+    fontSize: 14,
+    lineNumbers: 'on' as const,
+    insertSpaces: true,
+    tabSize: 4,
+    detectIndentation: false,
+    renderValidationDecorations: 'on' as const,
+  }), [])
+
+  return <Editor
+    language="python"
+    theme="vs-dark"
+    defaultValue={initialCode}
+    loading="Loading editor…"
+    onChange={onChange}
+    onMount={(editor, monaco) => {
+      editorRef.current = editor
+      onMount(editor, monaco)
+    }}
+    options={options}
+  />
+})
+
+export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isOpen, onClose, onEditorFocusChange }: CodeAreaProps) {
+  const editorRef = useRef<MonacoEditor | null>(null)
+  const statusRef = useRef<HTMLSpanElement | null>(null)
+  const saveStateRef = useRef<SaveState>('loading')
+  const renderCount = useRef(0)
+  const [initialCode, setInitialCode] = useState<string | null>(null)
   const [state, setState] = useState<SaveState>('loading')
   const [error, setError] = useState('')
   const [runtimeState, setRuntimeState] = useState<PythonRuntimeState>(runner.runtimeState)
   const [isRunning, setIsRunning] = useState(false)
   const [output, setOutput] = useState('')
+
+  if (import.meta.env.DEV) {
+    renderCount.current += 1
+    console.debug(`[CodeArea] render #${renderCount.current}`)
+  }
 
   useEffect(() => {
     const unsubscribe = runner.subscribe(setRuntimeState)
@@ -35,44 +81,63 @@ export function CodeArea({ runner, bridge, gameOutput, isOpen, onClose, onEditor
 
   useEffect(() => {
     apiRequest<CodeResponse>('/game/code')
-      .then(({ code: savedCode }) => {
-        setCode(savedCode)
+      .then(({ code }) => {
+        setInitialCode(code)
+        saveStateRef.current = 'saved'
         setState('saved')
       })
       .catch((reason: Error) => {
+        setInitialCode('')
         setError(`Could not load player.py: ${reason.message}`)
+        saveStateRef.current = 'unsaved'
         setState('unsaved')
       })
   }, [])
 
-  const save = async () => {
+  const handleEditorChange = useCallback(() => {
+    const started = import.meta.env.DEV ? performance.now() : 0
+    // Keep keystrokes entirely inside Monaco: refs and this DOM label do not render React.
+    saveStateRef.current = 'unsaved'
+    if (statusRef.current) {
+      statusRef.current.textContent = 'Unsaved changes'
+      statusRef.current.classList.remove('error')
+    }
+    if (import.meta.env.DEV) console.debug(`[CodeArea] Monaco onChange ${(performance.now() - started).toFixed(3)}ms`)
+  }, [])
+
+  const handleMount = useCallback<OnMount>((editor) => {
+    const focusBinding = bindEditorKeyboardFocus(editor, onEditorFocusChange)
+    editor.onDidDispose(() => {
+      editorRef.current = null
+      focusBinding.dispose()
+    })
+  }, [onEditorFocusChange])
+
+  const readCode = useCallback(() => editorRef.current?.getValue() ?? initialCode ?? '', [initialCode])
+
+  const save = useCallback(async () => {
+    saveStateRef.current = 'saving'
     setState('saving')
     setError('')
     try {
-      const saved = await apiRequest<CodeResponse>('/game/code', {
+      await apiRequest<CodeResponse>('/game/code', {
         method: 'PUT',
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code: readCode() }),
       })
-      setCode(saved.code)
+      saveStateRef.current = 'saved'
       setState('saved')
     } catch (reason) {
       setError(`Could not save player.py: ${(reason as Error).message}`)
+      saveStateRef.current = 'unsaved'
       setState('unsaved')
     }
-  }
+  }, [readCode])
 
-  const status = {
-    loading: 'Loading…',
-    saved: 'Saved',
-    unsaved: 'Unsaved changes',
-    saving: 'Saving…',
-  }[state]
-
-  const run = async () => {
+  const run = useCallback(async () => {
     setIsRunning(true)
     setOutput('')
     try {
-      const execution = await runner.run(code)
+      const execution = await runner.run(readCode())
       setOutput([execution.stdout, execution.result].filter(Boolean).join('\n'))
     } catch (reason) {
       const executionError = reason as Error & { stdout?: string }
@@ -80,67 +145,39 @@ export function CodeArea({ runner, bridge, gameOutput, isOpen, onClose, onEditor
     } finally {
       setIsRunning(false)
     }
-  }
+  }, [readCode, runner])
 
-  const apply = async () => {
+  const apply = useCallback(async () => {
     setIsRunning(true)
     setOutput('')
-    await bridge.apply(code)
+    await bridge.apply(readCode())
     setIsRunning(false)
-  }
+  }, [bridge, readCode])
 
-  return (
-    <section className="code-panel" aria-labelledby="code-title" hidden={!isOpen}>
-      <div className="code-panel-header">
-        <h2 id="code-title">player.py</h2>
-        <button className="code-panel-close secondary" type="button" onClick={onClose} aria-label="Close player.py editor">Close</button>
-      </div>
-      <div className="code-editor">
-        <Editor
-          language="python"
-          theme="vs-dark"
-          value={code}
-          loading="Loading editor…"
-          onChange={(value: string | undefined) => {
-            setCode(value ?? '')
-            setState('unsaved')
-            setError('')
-          }}
-          onMount={(editor) => {
-            const focusBinding = bindEditorKeyboardFocus(editor, onEditorFocusChange)
-            editor.onDidDispose(() => focusBinding.dispose())
-          }}
-          options={{ minimap: { enabled: false }, automaticLayout: true, fontSize: 14 }}
-        />
-      </div>
-      <div className="code-actions">
-        <button onClick={save} disabled={state === 'loading' || state === 'saving'}>Save</button>
-        <button
-          className="secondary"
-          onClick={run}
-          disabled={runtimeState !== 'ready' || isRunning}
-        >
-          {isRunning ? 'Running…' : 'Run'}
-        </button>
-        <button className="secondary" onClick={apply} disabled={runtimeState !== 'ready' || isRunning}>
-          Apply
-        </button>
-        <span className={`save-status ${error ? 'error' : ''}`} aria-live="polite">
-          {error || status}
-        </span>
-        <span className={`python-status ${runtimeState === 'error' ? 'error' : ''}`} aria-live="polite">
-          {runtimeState === 'loading' && 'Loading Python…'}
-          {runtimeState === 'ready' && 'Python ready'}
-          {runtimeState === 'error' && <>Python failed to load: {runner.runtimeError}</>}
-        </span>
-        {runtimeState === 'error' && <button className="secondary" type="button" onClick={() => runner.retry()}>
-          Retry
-        </button>}
-      </div>
-      <section className="output-panel" aria-labelledby="output-title">
-        <h3 id="output-title">OUTPUT</h3>
-        <pre aria-live="polite">{gameOutput || output}</pre>
-      </section>
-    </section>
-  )
-}
+  const displayedState = saveStateRef.current
+  const status = { loading: 'Loading…', saved: 'Saved', unsaved: 'Unsaved changes', saving: 'Saving…' }[displayedState]
+  const displayedError = displayedState === 'unsaved' ? '' : error
+
+  return <section className="code-panel" aria-labelledby="code-title" hidden={!isOpen}>
+    <div className="code-panel-header">
+      <h2 id="code-title">player.py</h2>
+      <button className="code-panel-close secondary" type="button" onClick={onClose} aria-label="Close player.py editor">Close</button>
+    </div>
+    <div className="code-editor">
+      {initialCode !== null && <CodeEditor initialCode={initialCode} editorRef={editorRef} onChange={handleEditorChange} onMount={handleMount} />}
+    </div>
+    <div className="code-actions">
+      <button onClick={save} disabled={state === 'loading' || state === 'saving'}>Save</button>
+      <button className="secondary" onClick={run} disabled={runtimeState !== 'ready' || isRunning}>{isRunning ? 'Running…' : 'Run'}</button>
+      <button className="secondary" onClick={apply} disabled={runtimeState !== 'ready' || isRunning}>Apply</button>
+      <span ref={statusRef} className={`save-status ${displayedError ? 'error' : ''}`} aria-live="polite">{displayedError || status}</span>
+      <span className={`python-status ${runtimeState === 'error' ? 'error' : ''}`} aria-live="polite">
+        {runtimeState === 'loading' && 'Loading Python…'}
+        {runtimeState === 'ready' && 'Python ready'}
+        {runtimeState === 'error' && <>Python failed to load: {runner.runtimeError}</>}
+      </span>
+      {runtimeState === 'error' && <button className="secondary" type="button" onClick={() => runner.retry()}>Retry</button>}
+    </div>
+    <section className="output-panel" aria-labelledby="output-title"><h3 id="output-title">OUTPUT</h3><pre aria-live="polite">{gameOutput || output}</pre></section>
+  </section>
+})
