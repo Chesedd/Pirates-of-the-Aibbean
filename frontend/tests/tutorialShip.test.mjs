@@ -17,10 +17,10 @@ test('ship journal is interactive and opens the tutorial book', () => {
   assert.match(scene, /setData\('role', 'tutorial-journal'\)/)
   assert.match(page, /<TutorialJournal/)
   assert.match(journal, /Судовой журнал/)
-  assert.match(journal, /Проверить запасы/)
-  assert.match(journal, /Восстановить координаты/)
+  assert.match(journal, /Проверка запасов/)
+  assert.match(journal, /Восстановление координат/)
   assert.match(journal, /Запас воды/)
-  assert.match(journal, /Зажечь сигнальный фонарь/)
+  assert.match(journal, /Сигнальный фонарь/)
   assert.match(journal, /Ты снова чувствуешь ноги/)
   assert.match(journal, /key_pressed\(\"d\"\)/)
 })
@@ -42,4 +42,17 @@ test('tutorial cabin contains a future exit without a transition handler', () =>
   assert.match(scene, /setData\('role', 'tutorial-exit'\)/)
   assert.match(scene, /setData\('transitionImplemented', false\)/)
   assert.doesNotMatch(scene, /exit\.on\('pointerup'/)
+})
+
+
+test('journal uses sequential task tabs and progressive theory', () => {
+  assert.match(journal, /state\.completed\.includes\(tab\) \|\| currentTask === tab/)
+  assert.match(journal, /disabled={!available}/)
+  assert.match(journal, /reachedStage >= 2/)
+  assert.match(journal, /reachedStage >= 3/)
+})
+
+test('cabin object labels and pirate journal emblem are removed', () => {
+  assert.doesNotMatch(scene, /'ГАМАК'|'ЖУРНАЛ'|'ВЫХОД'|☠/)
+  assert.match(scene, /compass\.lineStyle/)
 })
