@@ -2,12 +2,12 @@ import Phaser from 'phaser'
 import type { Island } from '../../pages/UserPage'
 import type { GamePythonBridge } from '../GamePythonBridge'
 import type { SceneLifecycleCallbacks } from '../createGame'
-import { createDirectionKeys } from '../gameKeyboard'
+import { GameKeyboardState } from '../gameKeyboard'
 import { configureIslandCamera, generateIslandGeometry, ISLAND_CENTER } from '../islandGeometry'
 
 export class IslandScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Container
-  private keys!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
+  private keys!: GameKeyboardState
   private bridge!: GamePythonBridge
   private lastTick = 0
   constructor() {
@@ -45,16 +45,20 @@ export class IslandScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
     this.player.on('pointerup', () => (this.registry.get('onPlayerClick') as () => void)())
     configureIslandCamera(this.cameras.main, this.player)
-    this.keys = createDirectionKeys(this.input.keyboard!)
+    this.keys = new GameKeyboardState(this.input.keyboard!)
     const lifecycle = this.registry.get('sceneLifecycle') as SceneLifecycleCallbacks
     lifecycle.onReady(this)
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => lifecycle.onShutdown(this))
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.keys.dispose()
+      lifecycle.onShutdown(this)
+    })
   }
 
   setKeyboardEnabled(enabled: boolean) {
     const keyboard = this.input.keyboard
     if (!keyboard) return
     keyboard.enabled = enabled
+    this.keys.setEnabled(enabled)
     if (!enabled) keyboard.resetKeys()
   }
 
@@ -62,9 +66,7 @@ export class IslandScene extends Phaser.Scene {
     if (time - this.lastTick < 50) return
     this.lastTick = time
     const position = { x: this.player.x, y: this.player.y }
-    const keys = { up: this.keys.up.isDown, down: this.keys.down.isDown,
-      left: this.keys.left.isDown, right: this.keys.right.isDown }
-    void this.bridge.tick(keys, position).then((next) => {
+    void this.bridge.tick(this.keys.snapshot(), position).then((next) => {
       if (next) this.player.setPosition(next.x, next.y)
     })
   }
