@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import type Phaser from 'phaser'
 import { createGame } from './createGame'
 import type { Island } from '../pages/UserPage'
@@ -15,7 +15,7 @@ type GameCanvasProps = {
   onJournalClick: () => void
 }
 
-export function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick, movementUnlocked, onJournalClick }: GameCanvasProps) {
+export const GameCanvas = memo(function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick, movementUnlocked, onJournalClick }: GameCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const lifecycleRef = useRef<GameSceneLifecycle | null>(null)
@@ -48,6 +48,6 @@ export function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayer
   }, [keyboardEnabled])
 
   return <div className="game-canvas" ref={containerRef} aria-label={movementUnlocked ? 'Your island game view' : 'Tutorial ship cabin'} />
-}
+})
 
 export type PhaserGame = Phaser.Game

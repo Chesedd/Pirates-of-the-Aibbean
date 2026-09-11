@@ -53,6 +53,14 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
 
   const openEditor = useCallback(() => setIsEditorOpen(true), [])
   const openJournal = useCallback(() => setJournalOpen(true), [])
+  const closeEditor = useCallback(() => {
+    setIsEditorFocused(false)
+    setIsEditorOpen(false)
+  }, [])
+  const closeJournal = useCallback(() => {
+    setIsEditorFocused(false)
+    setJournalOpen(false)
+  }, [])
   const finishTutorial = useCallback(() => {
     setJournalOpen(false)
     void apiRequest<Progress>('/game/progress').then(setProgress).catch((reason: Error) => setError(reason.message))
@@ -76,17 +84,14 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
           movementUnlocked={movementUnlocked}
           onJournalClick={openJournal}
         />}
-        {journalOpen && tutorial && <TutorialJournal initialState={tutorial} onClose={() => { setIsEditorFocused(false); setJournalOpen(false) }} onProgress={setTutorial} onFinished={finishTutorial} onEditorFocusChange={setIsEditorFocused} />}
+        {journalOpen && tutorial && <TutorialJournal initialState={tutorial} onClose={closeJournal} onProgress={setTutorial} onFinished={finishTutorial} onEditorFocusChange={setIsEditorFocused} />}
       </div>
       {runtime ? <CodeArea
         runner={runtime.runner}
         bridge={runtime.bridge}
         gameOutput={output}
         isOpen={isEditorOpen}
-        onClose={() => {
-          setIsEditorFocused(false)
-          setIsEditorOpen(false)
-        }}
+        onClose={closeEditor}
         onEditorFocusChange={setIsEditorFocused}
       /> : <p className="python-status" aria-live="polite">Loading Python…</p>}
     </div>
