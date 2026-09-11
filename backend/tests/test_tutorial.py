@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.user import Island, UserProgress
+from app.services.tutorial import TutorialCodeError, run_tutorial_code
 from tests.test_auth import login
 from tests.test_island import create_regular_user
 
@@ -18,6 +19,51 @@ def tutorial_user(client: TestClient) -> dict:
 
 def submit(client: TestClient, task: int, code: str):
     return client.post("/game/tutorial/check", json={"task": task, "code": code})
+
+
+def test_linear_allowlist_accepts_assignments_arithmetic_and_print() -> None:
+    code = "a = 2\nb = 3\nc = a + b\nprint(c)"
+    assert run_tutorial_code(code) == "5\n"
+
+
+@pytest.mark.parametrize(
+    ("code", "message"),
+    [
+        ("if a > 0:\n print(a)", "Конструкция if пока не изучена."),
+        ("for i in range(3):\n print(i)", "Циклы пока не открыты."),
+        ("def test():\n pass", "Создание функций пока не изучено."),
+        ("print(sum([1, 2]))", "Функция sum пока недоступна в этом задании."),
+    ],
+)
+def test_linear_allowlist_rejects_unlearned_syntax(code: str, message: str) -> None:
+    with pytest.raises(TutorialCodeError, match=message):
+        run_tutorial_code(code)
+
+
+def test_if_allowlist_accepts_simple_comparison() -> None:
+    assert run_tutorial_code('water = 6\nif water < 10:\n print("refill")', require_if=True) == "refill\n"
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        'water=6\nif water < 10:\n print("refill")\nelse:\n print("ok")',
+        'water=6\nif water < 10:\n print("refill")\nelif water == 10:\n print("ok")',
+    ],
+)
+def test_if_allowlist_rejects_else_and_elif(code: str) -> None:
+    with pytest.raises(TutorialCodeError, match="Эта конструкция пока не изучена"):
+        run_tutorial_code(code, require_if=True)
+
+
+def test_if_allowlist_rejects_while() -> None:
+    with pytest.raises(TutorialCodeError, match="Циклы пока не открыты"):
+        run_tutorial_code("water=6\nwhile water < 10:\n water += 1", require_if=True)
+
+
+def test_syntax_error_is_friendly() -> None:
+    with pytest.raises(TutorialCodeError, match="В коде есть синтаксическая ошибка"):
+        run_tutorial_code("if water < 10", require_if=True)
 
 
 def complete_linear_tasks(client: TestClient) -> None:
@@ -39,6 +85,14 @@ def test_wrong_result_does_not_advance(client: TestClient, users) -> None:
     tutorial_user(client)
     response = submit(client, 1, "print(13)")
     assert response.json()["correct"] is False
+    assert client.get("/game/tutorial").json() == {"current_task": 1, "completed": []}
+
+
+def test_allowlist_failure_does_not_execute_or_advance(client: TestClient, users) -> None:
+    tutorial_user(client)
+    response = submit(client, 1, "if 1 > 0:\n print(14)")
+    assert response.json()["correct"] is False
+    assert response.json()["output"] == ""
     assert client.get("/game/tutorial").json() == {"current_task": 1, "completed": []}
 
 
