@@ -20,8 +20,58 @@ class TutorialCapabilities:
     if_statement: bool = False
 
 
+@dataclass(frozen=True)
+class TutorialTask:
+    """Declarative requirements for one tutorial exercise."""
+
+    id: int
+    capabilities: TutorialCapabilities
+    required_variables: tuple[str, ...]
+    expected_output: str
+    require_if: bool = False
+    variable_purposes: tuple[tuple[str, str], ...] = ()
+
+
 LINEAR_CAPABILITIES = TutorialCapabilities()
 IF_CAPABILITIES = TutorialCapabilities(comparisons=True, if_statement=True)
+
+TUTORIAL_TASKS = {
+    1: TutorialTask(
+        id=1,
+        capabilities=LINEAR_CAPABILITIES,
+        required_variables=("water", "food", "rations", "total"),
+        expected_output="14\n",
+        variable_purposes=(
+            ("water", "для учёта воды на корабле"),
+            ("food", "для учёта еды на корабле"),
+            ("rations", "для учёта сухих пайков"),
+            ("total", "для подсчёта всех припасов"),
+        ),
+    ),
+    2: TutorialTask(
+        id=2,
+        capabilities=LINEAR_CAPABILITIES,
+        required_variables=("x", "y"),
+        expected_output="17\n5\n",
+        variable_purposes=(("x", "для хранения координаты X"), ("y", "для хранения координаты Y")),
+    ),
+    3: TutorialTask(
+        id=3,
+        capabilities=IF_CAPABILITIES,
+        required_variables=("water",),
+        expected_output="refill\n",
+        require_if=True,
+        variable_purposes=(("water", "для управления запасами корабля"),),
+    ),
+    4: TutorialTask(
+        id=4,
+        capabilities=IF_CAPABILITIES,
+        required_variables=("fuel",),
+        expected_output="light\n",
+        require_if=True,
+        variable_purposes=(("fuel", "для проверки топлива в сигнальном фонаре"),),
+    ),
+}
 
 ARITHMETIC_OPERATORS = (ast.Add, ast.Sub, ast.Mult, ast.Div)
 COMPARISON_OPERATORS = (ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Eq, ast.NotEq)
@@ -142,6 +192,31 @@ def parse_and_validate(source: str, capabilities: TutorialCapabilities) -> ast.M
     return tree
 
 
+def validate_required_variables(tree: ast.Module, task: TutorialTask) -> None:
+    """Ensure required names occur in the AST and receive a value before execution."""
+    loaded = {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+    }
+    assigned = {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    }
+    purposes = dict(task.variable_purposes)
+
+    for name in task.required_variables:
+        if name not in loaded and name not in assigned:
+            purpose = purposes.get(name, "для этой записи в журнале капитана")
+            raise TutorialCodeError(
+                "Кажется, ты решил задачу другим способом.\n\n"
+                f"Попробуй использовать переменную {name} —\nона нужна {purpose}."
+            )
+        if name not in assigned:
+            raise TutorialCodeError(f"Переменная {name} пока не получила значение.\nСначала создай её.")
+
+
 OPERATORS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv}
 COMPARISONS = {ast.Lt: operator.lt, ast.LtE: operator.le, ast.Gt: operator.gt, ast.GtE: operator.ge, ast.Eq: operator.eq, ast.NotEq: operator.ne}
 Value = int | float | str | bool
@@ -182,16 +257,22 @@ def _run_statements(statements: list[ast.stmt], variables: dict[str, Value], out
                 _run_statements(statement.body, variables, output, allow_if=True)
 
 
-def run_tutorial_code(source: str, *, require_if: bool = False) -> str:
-    capabilities = IF_CAPABILITIES if require_if else LINEAR_CAPABILITIES
+def run_tutorial_code(
+    source: str, *, require_if: bool = False, task: TutorialTask | None = None
+) -> str:
+    capabilities = (
+        task.capabilities
+        if task is not None
+        else (IF_CAPABILITIES if require_if else LINEAR_CAPABILITIES)
+    )
     tree = parse_and_validate(source, capabilities)
-    if require_if and not any(isinstance(node, ast.If) for node in ast.walk(tree)):
+    if task is not None:
+        validate_required_variables(tree, task)
+    needs_if = task.require_if if task is not None else require_if
+    if needs_if and not any(isinstance(node, ast.If) for node in ast.walk(tree)):
         raise TutorialCodeError("Используй if, чтобы действие выполнялось только при нужном условии.")
 
     variables: dict[str, Value] = {}
     output: list[str] = []
-    _run_statements(tree.body, variables, output, allow_if=require_if)
+    _run_statements(tree.body, variables, output, allow_if=needs_if)
     return "\n".join(output) + ("\n" if output else "")
-
-
-EXPECTED_OUTPUT = {1: "14\n", 2: "17\n5\n", 3: "refill\n", 4: "light\n"}

@@ -10,7 +10,7 @@ from app.schemas.code import PlayerCodePayload, PlayerCodePublic
 from app.schemas.island import IslandPublic, PlayerPositionUpdate
 from app.schemas.progress import ProgressPublic
 from app.schemas.tutorial import TutorialResult, TutorialState, TutorialSubmission
-from app.services.tutorial import EXPECTED_OUTPUT, TutorialCodeError, run_tutorial_code
+from app.services.tutorial import TUTORIAL_TASKS, TutorialCodeError, run_tutorial_code
 
 router = APIRouter(prefix="/game", tags=["game"])
 
@@ -45,10 +45,11 @@ def check_tutorial(
     if payload.task not in range(1, 5) or payload.task != state.current_task:
         raise HTTPException(status.HTTP_409_CONFLICT, "Complete tutorial tasks in order")
     try:
-        output = run_tutorial_code(payload.code, require_if=payload.task in (3, 4))
+        task = TUTORIAL_TASKS[payload.task]
+        output = run_tutorial_code(payload.code, task=task)
     except TutorialCodeError as exc:
         return TutorialResult(**state.model_dump(), correct=False, output="", error=str(exc))
-    correct = output == EXPECTED_OUTPUT[payload.task]
+    correct = output == task.expected_output
     if correct:
         db.add(UserUnlock(progress_id=progress.id, key=TUTORIAL_KEYS[payload.task - 1]))
         if payload.task == 4:

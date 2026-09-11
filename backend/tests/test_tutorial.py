@@ -4,7 +4,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.user import Island, UserProgress
-from app.services.tutorial import TutorialCodeError, run_tutorial_code
+from app.services.tutorial import (
+    TUTORIAL_TASKS,
+    TutorialCodeError,
+    parse_and_validate,
+    run_tutorial_code,
+    validate_required_variables,
+)
 from tests.test_auth import login
 from tests.test_island import create_regular_user
 
@@ -67,8 +73,29 @@ def test_syntax_error_is_friendly() -> None:
 
 
 def complete_linear_tasks(client: TestClient) -> None:
-    assert submit(client, 1, "print(14)").json()["correct"] is True
-    assert submit(client, 2, "print(17)\nprint(5)").json()["correct"] is True
+    supplies = "water=7\nfood=4\nrations=3\ntotal=water+food+rations\nprint(total)"
+    assert submit(client, 1, supplies).json()["correct"] is True
+    assert submit(client, 2, "x=12\ny=8\nx=x+5\ny=y-3\nprint(x)\nprint(y)").json()["correct"] is True
+
+
+@pytest.mark.parametrize(
+    ("code", "passes", "message"),
+    [
+        ("water = 5\nprint(water)", True, None),
+        ("x = 5\nprint(x)", False, "Попробуй использовать переменную water"),
+        ("print(water)", False, "Переменная water пока не получила значение"),
+        ("water = 5", True, None),
+        ("water = 5\npirate = 10", True, None),
+    ],
+)
+def test_required_variable_validation(code: str, passes: bool, message: str | None) -> None:
+    task = TUTORIAL_TASKS[3]
+    tree = parse_and_validate(code, task.capabilities)
+    if passes:
+        validate_required_variables(tree, task)
+    else:
+        with pytest.raises(TutorialCodeError, match=message):
+            validate_required_variables(tree, task)
 
 
 def test_first_task_accepts_correct_result(client: TestClient, users) -> None:
@@ -83,7 +110,7 @@ def test_first_task_accepts_correct_result(client: TestClient, users) -> None:
 
 def test_wrong_result_does_not_advance(client: TestClient, users) -> None:
     tutorial_user(client)
-    response = submit(client, 1, "print(13)")
+    response = submit(client, 1, "water=7\nfood=4\nrations=3\ntotal=13\nprint(total)")
     assert response.json()["correct"] is False
     assert client.get("/game/tutorial").json() == {"current_task": 1, "completed": []}
 
@@ -96,15 +123,18 @@ def test_allowlist_failure_does_not_execute_or_advance(client: TestClient, users
     assert client.get("/game/tutorial").json() == {"current_task": 1, "completed": []}
 
 
-def test_alternative_correct_code_is_accepted(client: TestClient, users) -> None:
+def test_correct_output_without_required_variables_is_rejected(client: TestClient, users) -> None:
     tutorial_user(client)
     response = submit(client, 1, "bottles = 10\nspare = 4\nprint(bottles + spare)")
-    assert response.json()["correct"] is True
+    assert response.json()["correct"] is False
+    assert response.json()["output"] == ""
+    assert "переменную water" in response.json()["error"]
+    assert client.get("/game/tutorial").json() == {"current_task": 1, "completed": []}
 
 
 def test_coordinates_task_and_progress_survive_refresh(client: TestClient, users) -> None:
     tutorial_user(client)
-    submit(client, 1, "print(7 + 4 + 3)")
+    submit(client, 1, "water=7\nfood=4\nrations=3\ntotal=water+food+rations\nprint(total)")
     assert client.get("/game/tutorial").json()["current_task"] == 2
     response = submit(client, 2, "x=12\ny=8\nx=x+5\ny=y-3\nprint(x)\nprint(y)")
     assert response.json()["correct"] is True
@@ -114,7 +144,7 @@ def test_coordinates_task_and_progress_survive_refresh(client: TestClient, users
 
 def test_completion_is_saved_server_side(client: TestClient, users, db: Session) -> None:
     created = tutorial_user(client)
-    submit(client, 1, "print(14)")
+    submit(client, 1, "water=7\nfood=4\nrations=3\ntotal=water+food+rations\nprint(total)")
     progress = db.scalar(select(UserProgress).where(UserProgress.user_id == created["id"]))
     assert progress is not None
     assert {unlock.key for unlock in progress.unlocks} == {"tutorial_linear_1"}
@@ -130,7 +160,7 @@ def test_tutorial_execution_cannot_change_player_position(client: TestClient, us
     island = db.scalar(select(Island).where(Island.user_id == created["id"]))
     assert island is not None
     original = (island.player_x, island.player_y)
-    response = submit(client, 1, "player_x=999\nplayer_y=999\nprint(14)")
+    response = submit(client, 1, "water=7\nfood=4\nrations=3\ntotal=water+food+rations\nplayer_x=999\nplayer_y=999\nprint(total)")
     db.refresh(island)
     assert response.json()["correct"] is True
     assert (island.player_x, island.player_y) == original
