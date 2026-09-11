@@ -40,6 +40,11 @@ def update_position(payload: PlayerPositionUpdate, user: User = Depends(current_
     island = db.scalar(select(Island).where(Island.user_id == user.id))
     if island is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Island not found")
+    progress = db.scalar(select(UserProgress).where(UserProgress.user_id == user.id))
+    if progress is None or not any(unlock.key == "movement" for unlock in progress.unlocks):
+        # Coordinates are server-owned. Running arbitrary player.py remains allowed, but
+        # it cannot use this endpoint to escape the tutorial before the unlock exists.
+        return IslandPublic.from_island(island)
     if not position_is_on_island(island.generation_seed, payload.x, payload.y):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Position is outside the island")
     island.player_x, island.player_y = payload.x, payload.y

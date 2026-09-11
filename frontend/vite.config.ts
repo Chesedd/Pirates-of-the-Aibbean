@@ -8,6 +8,9 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['pyodide'],
   },
+  worker: {
+    format: 'es',
+  },
   // The npm package contains the core interpreter assets, not Pyodide's full
   // package repository. Vite serves/copies these files from our own origin.
   publicDir: 'node_modules/pyodide',

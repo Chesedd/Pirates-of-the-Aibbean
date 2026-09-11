@@ -9,6 +9,7 @@ export class GamePythonBridge {
   private busy = false
   private disposed = false
   private coastline: Point[] | null = null
+  private movementUnlocked = true
   constructor(private readonly runner: Pick<PythonRunner, 'apply' | 'tick'>,
     private readonly onOutput: (message: string) => void = () => undefined,
     private readonly onPosition: (position: GamePosition) => void = () => undefined) {}
@@ -16,6 +17,11 @@ export class GamePythonBridge {
   /** Uses the very same polygon that the scene renders; no collision shape is derived separately. */
   setIslandGeometry(coastline: Point[]): void {
     this.coastline = coastline
+  }
+
+  setMovementUnlocked(unlocked: boolean): void {
+    this.movementUnlocked = unlocked
+    if (!unlocked) this.coastline = null
   }
 
   async apply(code: string) {
@@ -42,6 +48,7 @@ export class GamePythonBridge {
       if (result.stdout) this.onOutput(result.stdout)
       if (typeof result.x !== 'number' || typeof result.y !== 'number' ||
           !Number.isFinite(result.x) || !Number.isFinite(result.y)) throw new Error('player.py returned invalid coordinates.')
+      if (!this.movementUnlocked) return position
       const next = {
         x: position.x + Math.max(-MAX_TICK_MOVE, Math.min(MAX_TICK_MOVE, result.x - position.x)),
         y: position.y + Math.max(-MAX_TICK_MOVE, Math.min(MAX_TICK_MOVE, result.y - position.y)),

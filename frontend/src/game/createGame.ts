@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { IslandScene } from './scenes/IslandScene'
+import { TutorialShipScene } from './scenes/TutorialShipScene'
 import type { Island } from '../pages/UserPage'
 import type { GamePythonBridge } from './GamePythonBridge'
 import type { KeyboardScene } from './GameSceneLifecycle'
@@ -15,6 +16,8 @@ export function createGame(
   pythonBridge: GamePythonBridge,
   username: string,
   onPlayerClick: () => void,
+  movementUnlocked: boolean,
+  onJournalClick: () => void,
   sceneLifecycle: SceneLifecycleCallbacks,
 ): Phaser.Game {
   return new Phaser.Game({
@@ -26,13 +29,14 @@ export function createGame(
       width: '100%',
       height: '100%',
     },
-    scene: IslandScene,
+    scene: movementUnlocked ? IslandScene : TutorialShipScene,
     callbacks: {
       preBoot: (game) => {
         game.registry.set('island', island)
         game.registry.set('pythonBridge', pythonBridge)
         game.registry.set('username', username)
         game.registry.set('onPlayerClick', onPlayerClick)
+        game.registry.set('onJournalClick', onJournalClick)
         game.registry.set('sceneLifecycle', sceneLifecycle)
       },
     },

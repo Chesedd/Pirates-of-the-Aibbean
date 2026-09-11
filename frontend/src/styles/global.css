@@ -19,6 +19,9 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: .75rem; bord
 .game-pane { position: relative; min-width: 0; min-height: 34rem; display: grid; }
 .game-canvas { width: 100%; min-height: 34rem; height: calc(100vh - 5.5rem); overflow: hidden; }
 .game-canvas canvas { display: block; }.game-status { align-self: center; justify-self: center; }
+.journal-backdrop { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 1rem; background: rgb(3 12 18 / 65%); }
+.journal-dialog { width: min(28rem, 100%); padding: 2rem; border: 2px solid #8b5a2b; border-radius: .6rem; color: #2e2115; background: #e8d3a2; box-shadow: 0 1rem 3rem rgb(0 0 0 / 55%); }
+.journal-dialog h2 { margin-top: 0; }.journal-dialog button { float: right; }
 .code-panel { min-width: 0; min-height: 34rem; display: grid; grid-template-rows: auto minmax(18rem, 1fr) auto minmax(7rem, auto); padding: 1rem; gap: .8rem; border-left: 1px solid #315369; background: #0b2538; }
 .code-panel[hidden] { display: none; }
 .code-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
