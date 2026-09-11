@@ -21,6 +21,18 @@ class TutorialCapabilities:
 
 
 @dataclass(frozen=True)
+class ConditionRule:
+    """The exact shape of a comparison required by a tutorial task.
+
+    A string value names another variable; numeric values are AST constants.
+    """
+
+    variable: str
+    operator: str
+    value: int | float | str
+
+
+@dataclass(frozen=True)
 class TutorialTask:
     """Declarative requirements for one tutorial exercise."""
 
@@ -30,6 +42,7 @@ class TutorialTask:
     expected_output: str
     require_if: bool = False
     variable_purposes: tuple[tuple[str, str], ...] = ()
+    required_conditions: tuple[ConditionRule, ...] = ()
 
 
 LINEAR_CAPABILITIES = TutorialCapabilities()
@@ -62,6 +75,7 @@ TUTORIAL_TASKS = {
         expected_output="refill\n",
         require_if=True,
         variable_purposes=(("water", "для управления запасами корабля"),),
+        required_conditions=(ConditionRule(variable="water", operator="<", value=10),),
     ),
     4: TutorialTask(
         id=4,
@@ -70,6 +84,7 @@ TUTORIAL_TASKS = {
         expected_output="light\n",
         require_if=True,
         variable_purposes=(("fuel", "для проверки топлива в сигнальном фонаре"),),
+        required_conditions=(ConditionRule(variable="fuel", operator=">", value=0),),
     ),
 }
 
@@ -149,6 +164,12 @@ class TutorialSyntaxValidator(ast.NodeVisitor):
         for statement in node.body:
             self.visit(statement)
 
+    def visit_BoolOp(self, node: ast.BoolOp) -> None:  # noqa: N802
+        raise TutorialCodeError(
+            "На этой странице журнала нужен один простой сигнал.\n"
+            "Условия с and и or пока не изучены."
+        )
+
     def visit_For(self, node: ast.For) -> None:  # noqa: N802
         self._reject_loop()
 
@@ -205,9 +226,15 @@ def validate_required_variables(tree: ast.Module, task: TutorialTask) -> None:
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
     }
     purposes = dict(task.variable_purposes)
+    condition_variables = {rule.variable for rule in task.required_conditions}
+    has_if = any(isinstance(node, ast.If) for node in ast.walk(tree))
 
     for name in task.required_variables:
         if name not in loaded and name not in assigned:
+            # For an if exercise, the condition validator can give a much more
+            # useful explanation when a different stock is being inspected.
+            if has_if and name in condition_variables:
+                continue
             purpose = purposes.get(name, "для этой записи в журнале капитана")
             raise TutorialCodeError(
                 "Кажется, ты решил задачу другим способом.\n\n"
@@ -215,6 +242,76 @@ def validate_required_variables(tree: ast.Module, task: TutorialTask) -> None:
             )
         if name not in assigned:
             raise TutorialCodeError(f"Переменная {name} пока не получила значение.\nСначала создай её.")
+
+
+CONDITION_OPERATOR_TYPES = {
+    "<": ast.Lt,
+    ">": ast.Gt,
+    "<=": ast.LtE,
+    ">=": ast.GtE,
+    "==": ast.Eq,
+    "!=": ast.NotEq,
+}
+
+
+def validate_required_conditions(tree: ast.Module, task: TutorialTask) -> None:
+    """Compare required if conditions directly against the parsed AST."""
+    if not task.required_conditions:
+        return
+
+    if_nodes = [node for node in ast.walk(tree) if isinstance(node, ast.If)]
+    if len(if_nodes) != 1:
+        raise TutorialCodeError(
+            "В этой задаче нужен один сигнал проверки.\n"
+            "Попробуй решить её одним условием."
+        )
+    if len(task.required_conditions) != 1:
+        raise ValueError("A single-if tutorial task must define exactly one condition rule")
+
+    condition = if_nodes[0].test
+    rule = task.required_conditions[0]
+    if (
+        not isinstance(condition, ast.Compare)
+        or len(condition.ops) != 1
+        or len(condition.comparators) != 1
+        or not isinstance(condition.left, ast.Name)
+        or not isinstance(condition.comparators[0], (ast.Name, ast.Constant))
+        or (
+            isinstance(condition.comparators[0], ast.Constant)
+            and type(condition.comparators[0].value) not in (int, float)
+        )
+    ):
+        raise TutorialCodeError(
+            "Курс проложен слишком сложным условием.\n"
+            "Сравни одну переменную с числом или другой переменной."
+        )
+
+    if condition.left.id != rule.variable:
+        raise TutorialCodeError(
+            "Кажется, ты проверяешь не тот запас.\n\n"
+            "Для этой задачи нужно следить за количеством воды."
+            if rule.variable == "water"
+            else "Кажется, ты проверяешь не тот запас.\n\n"
+            f"Для этой задачи нужно следить за переменной {rule.variable}."
+        )
+
+    expected_operator = CONDITION_OPERATOR_TYPES.get(rule.operator)
+    if expected_operator is None:
+        raise ValueError(f"Unsupported tutorial condition operator: {rule.operator}")
+    if type(condition.ops[0]) is not expected_operator:
+        raise TutorialCodeError(
+            "Условие работает наоборот.\n\n"
+            "Проверь, когда именно нужно пополнить запас."
+        )
+
+    right = condition.comparators[0]
+    actual_value: int | float | str = right.id if isinstance(right, ast.Name) else right.value
+    # Compare types as well as values: True must not silently stand in for 1.
+    if type(actual_value) is not type(rule.value) or actual_value != rule.value:
+        raise TutorialCodeError(
+            "Порог запаса выбран неправильно.\n\n"
+            "Посмотри условия задания ещё раз."
+        )
 
 
 OPERATORS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv}
@@ -271,6 +368,8 @@ def run_tutorial_code(
     needs_if = task.require_if if task is not None else require_if
     if needs_if and not any(isinstance(node, ast.If) for node in ast.walk(tree)):
         raise TutorialCodeError("Используй if, чтобы действие выполнялось только при нужном условии.")
+    if task is not None:
+        validate_required_conditions(tree, task)
 
     variables: dict[str, Value] = {}
     output: list[str] = []
