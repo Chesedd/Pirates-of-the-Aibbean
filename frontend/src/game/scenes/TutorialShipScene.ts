@@ -60,7 +60,6 @@ export class TutorialShipScene extends Phaser.Scene {
     g.fillStyle(0x8d7250).fillRoundedRect(110, 102, 188, 94, 28)
     g.lineStyle(4, 0xd0b889).strokeRoundedRect(110, 102, 188, 94, 28)
     for (let x = 135; x < 290; x += 28) g.lineStyle(2, 0x6c543a).lineBetween(x, 108, x, 190)
-    this.add.text(204, 149, 'ГАМАК', { color: '#2e2017', fontSize: '12px', fontStyle: 'bold' }).setOrigin(.5)
 
     // A round barrel top, including the lid rings.
     g.fillStyle(0x81502a).fillCircle(744, 130, 43)
@@ -100,10 +99,9 @@ export class TutorialShipScene extends Phaser.Scene {
     g.lineStyle(4, 0x392619).strokeCircle(548, 111, 19).lineBetween(536, 91, 560, 91)
 
     // The future exit is a closed hatch set into the lower wall; it has no handler yet.
-    const exit = this.add.rectangle(470, 506, 136, 38, 0x54321f).setStrokeStyle(5, 0xc08a4b)
+    this.add.rectangle(470, 506, 136, 38, 0x54321f).setStrokeStyle(5, 0xc08a4b)
       .setData('role', 'tutorial-exit').setData('transitionImplemented', false)
     this.add.circle(514, 506, 5, 0xe2b85f)
-    this.add.text(exit.x, 479, 'ВЫХОД', { color: '#d9bd86', fontSize: '12px', fontStyle: 'bold' }).setOrigin(.5)
 
     // Decorative porthole is mounted flat in the upper wall.
     g.fillStyle(0x235568).fillCircle(405, 48, 13)
@@ -111,10 +109,14 @@ export class TutorialShipScene extends Phaser.Scene {
   }
 
   private createJournal() {
-    const journal = this.add.rectangle(705, 277, 62, 48, 0x9d3826).setStrokeStyle(4, 0xe3b861)
+    const journal = this.add.rectangle(705, 277, 62, 48, 0x713e2a).setStrokeStyle(4, 0xc99c56)
       .setInteractive({ useHandCursor: true }).setData('role', 'tutorial-journal')
-    this.add.text(705, 277, '☠', { color: '#ffe39a', fontSize: '22px' }).setOrigin(0.5)
-    this.add.text(705, 306, 'ЖУРНАЛ', { color: '#ffe4a3', fontSize: '11px', fontStyle: 'bold' }).setOrigin(.5)
+    const compass = this.add.graphics().setPosition(705, 277)
+    compass.lineStyle(2, 0xe2c47f).strokeCircle(0, 0, 15)
+    compass.lineStyle(1, 0xb78946).lineBetween(-18, 0, 18, 0).lineBetween(0, -18, 0, 18)
+    compass.fillStyle(0xe8d392).fillTriangle(0, -15, -4, 3, 4, 3)
+    compass.fillStyle(0xa96a3b).fillTriangle(0, 15, -4, -3, 4, -3)
+    compass.fillStyle(0xe2c47f).fillCircle(0, 0, 2)
     journal.on('pointerover', () => journal.setStrokeStyle(6, 0xffe69a))
     journal.on('pointerout', () => journal.setStrokeStyle(4, 0xe3b861))
     journal.on('pointerup', () => (this.registry.get('onJournalClick') as () => void)())
