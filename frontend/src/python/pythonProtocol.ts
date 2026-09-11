@@ -1,4 +1,5 @@
-export type GameKeys = Record<'up' | 'down' | 'left' | 'right', boolean>
+/** Serializable key state only; browser and Phaser event objects never cross into Python. */
+export type GameKeys = Record<string, boolean>
 export type GamePosition = { x: number; y: number }
 
 export type PythonWorkerRequest =
