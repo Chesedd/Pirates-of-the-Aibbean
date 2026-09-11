@@ -9,6 +9,7 @@ from app.services.tutorial import (
     TutorialCodeError,
     parse_and_validate,
     run_tutorial_code,
+    validate_required_conditions,
     validate_required_variables,
 )
 from tests.test_auth import login
@@ -48,6 +49,47 @@ def test_linear_allowlist_rejects_unlearned_syntax(code: str, message: str) -> N
 
 def test_if_allowlist_accepts_simple_comparison() -> None:
     assert run_tutorial_code('water = 6\nif water < 10:\n print("refill")', require_if=True) == "refill\n"
+
+
+def test_required_condition_accepts_the_configured_comparison() -> None:
+    task = TUTORIAL_TASKS[3]
+    tree = parse_and_validate('water = 5\nif water < 10:\n print("refill")', task.capabilities)
+    validate_required_conditions(tree, task)
+
+
+@pytest.mark.parametrize(
+    ("condition", "message"),
+    [
+        ("food < 10", "не тот запас"),
+        ("water > 10", "работает наоборот"),
+        ("water < 20", "Порог запаса выбран неправильно"),
+        ("water < food", "Порог запаса выбран неправильно"),
+    ],
+)
+def test_required_condition_rejects_wrong_semantics(condition: str, message: str) -> None:
+    task = TUTORIAL_TASKS[3]
+    tree = parse_and_validate(f'water = 5\nfood = 10\nif {condition}:\n print("refill")', task.capabilities)
+    with pytest.raises(TutorialCodeError, match=message):
+        validate_required_conditions(tree, task)
+
+
+def test_required_condition_rejects_two_if_statements() -> None:
+    task = TUTORIAL_TASKS[3]
+    tree = parse_and_validate(
+        'water = 5\nfuel = 3\nif water < 10:\n print("refill")\nif fuel < 5:\n print("fuel")',
+        task.capabilities,
+    )
+    with pytest.raises(TutorialCodeError, match="один сигнал проверки"):
+        validate_required_conditions(tree, task)
+
+
+def test_if_allowlist_rejects_combined_conditions() -> None:
+    task = TUTORIAL_TASKS[3]
+    with pytest.raises(TutorialCodeError, match="and и or пока не изучены"):
+        parse_and_validate(
+            'water = 5\nfood = 1\nif water < 10 and food > 0:\n print("refill")',
+            task.capabilities,
+        )
 
 
 @pytest.mark.parametrize(
@@ -198,7 +240,32 @@ def test_wrong_if_condition_does_not_advance(client: TestClient, users) -> None:
     complete_linear_tasks(client)
     response = submit(client, 3, 'water=6\nif water > 10:\n print("refill")')
     assert response.json()["correct"] is False
+    assert response.json()["output"] == ""
+    assert "работает наоборот" in response.json()["error"]
     assert client.get("/game/tutorial").json()["current_task"] == 3
+
+
+@pytest.mark.parametrize(
+    ("condition", "message"),
+    [
+        ("food < 10", "не тот запас"),
+        ("water < 20", "Порог запаса выбран неправильно"),
+    ],
+)
+def test_semantically_wrong_if_is_not_executed_or_saved(
+    client: TestClient, users, condition: str, message: str
+) -> None:
+    tutorial_user(client)
+    complete_linear_tasks(client)
+    response = submit(
+        client,
+        3,
+        f'water=6\nfood=5\nif {condition}:\n print("refill")',
+    )
+    assert response.json()["correct"] is False
+    assert response.json()["output"] == ""
+    assert message in response.json()["error"]
+    assert client.get("/game/tutorial").json() == {"current_task": 3, "completed": [1, 2]}
 
 
 @pytest.mark.parametrize("branch", ["else:\n print(\"wait\")", "elif water == 6:\n print(\"refill\")"])
