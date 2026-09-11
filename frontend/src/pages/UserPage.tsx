@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { apiRequest } from '../api/client'
 import type { User } from '../app/App'
 import { GameCanvas } from '../game/GameCanvas'
@@ -7,29 +7,32 @@ import { createBrowserPythonRunner } from '../python/PythonRunner'
 import { GamePythonBridge } from '../game/GamePythonBridge'
 
 export type Island = { id: number; generation_seed: number; player: { x: number; y: number } }
+type PythonRuntime = { runner: ReturnType<typeof createBrowserPythonRunner>; bridge: GamePythonBridge }
+
 export function UserPage({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [island, setIsland] = useState<Island | null>(null)
   const [error, setError] = useState('')
   const [output, setOutput] = useState('')
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [isEditorFocused, setIsEditorFocused] = useState(false)
-  // Unlike a useState initializer, this guarded ref initialization is not invoked
-  // twice by React StrictMode's development render check.
-  const runnerRef = useRef<ReturnType<typeof createBrowserPythonRunner> | null>(null)
-  if (!runnerRef.current) runnerRef.current = createBrowserPythonRunner()
-  const runner = runnerRef.current
-  const bridgeRef = useRef<GamePythonBridge | null>(null)
-  if (!bridgeRef.current) {
+  const [runtime, setRuntime] = useState<PythonRuntime | null>(null)
+
+  useEffect(() => {
+    const runner = createBrowserPythonRunner()
     let lastSave = 0
-    bridgeRef.current = new GamePythonBridge(runner, setOutput, (position) => {
+    const bridge = new GamePythonBridge(runner, setOutput, (position) => {
       if (Date.now() - lastSave < 5_000) return
       lastSave = Date.now()
       void apiRequest('/game/position', { method: 'PUT', body: JSON.stringify(position) })
     })
-  }
-  const bridge = bridgeRef.current
-
-  useEffect(() => () => runner.dispose(), [runner])
+    const nextRuntime = { runner, bridge }
+    setRuntime(nextRuntime)
+    return () => {
+      bridge.dispose()
+      runner.dispose()
+      setRuntime((current) => current === nextRuntime ? null : current)
+    }
+  }, [])
 
   useEffect(() => {
     apiRequest<Island>('/game/island').then(setIsland).catch((reason: Error) => setError(reason.message))
@@ -46,17 +49,17 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
       <div className="game-pane">
         {error && <p className="error game-status">Could not load the island: {error}</p>}
         {!error && !island && <p className="game-status">Charting your island…</p>}
-        {island && <GameCanvas
+        {island && runtime && <GameCanvas
           island={island}
-          bridge={bridge}
+          bridge={runtime.bridge}
           username={user.username}
           keyboardEnabled={!isEditorFocused}
           onPlayerClick={openEditor}
         />}
       </div>
-      <CodeArea
-        runner={runner}
-        bridge={bridge}
+      {runtime ? <CodeArea
+        runner={runtime.runner}
+        bridge={runtime.bridge}
         gameOutput={output}
         isOpen={isEditorOpen}
         onClose={() => {
@@ -64,7 +67,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
           setIsEditorOpen(false)
         }}
         onEditorFocusChange={setIsEditorFocused}
-      />
+      /> : <p className="python-status" aria-live="polite">Loading Python…</p>}
     </div>
   </main>
 }

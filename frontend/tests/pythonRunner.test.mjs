@@ -155,3 +155,32 @@ test('ignores a response with an outdated run id', async () => {
   assert.deepEqual(await execution, { stdout: 'new', result: '' })
   runner.dispose()
 })
+
+test('StrictMode-style setup, cleanup, and setup owns fresh working workers', () => {
+  const workers = []
+  const createRunner = () => new PythonRunner(() => {
+    const worker = new MockWorker()
+    workers.push(worker)
+    return worker
+  })
+
+  const firstRunner = createRunner()
+  const firstWorker = workers[0]
+  const firstStates = []
+  firstRunner.subscribe((state) => firstStates.push(state))
+  firstRunner.dispose()
+
+  const secondRunner = createRunner()
+  const secondWorker = workers[1]
+  const secondStates = []
+  secondRunner.subscribe((state) => secondStates.push(state))
+  firstWorker.emit({ type: 'ready' })
+  assert.deepEqual(secondStates, ['loading'], 'the old worker cannot update the new UI state')
+  secondWorker.emit({ type: 'ready' })
+
+  assert.equal(firstWorker.terminated, true)
+  assert.equal(secondRunner.runtimeState, 'ready')
+  assert.deepEqual(secondStates, ['loading', 'ready'])
+  secondRunner.dispose()
+  assert.equal(secondWorker.terminated, true)
+})
