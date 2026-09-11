@@ -18,4 +18,8 @@ test('ship journal is interactive and opens the tutorial book', () => {
   assert.match(journal, /Судовой журнал/)
   assert.match(journal, /Проверить запасы/)
   assert.match(journal, /Восстановить координаты/)
+  assert.match(journal, /Запас воды/)
+  assert.match(journal, /Зажечь сигнальный фонарь/)
+  assert.match(journal, /Ты снова чувствуешь ноги/)
+  assert.match(journal, /key_pressed\(\"d\"\)/)
 })

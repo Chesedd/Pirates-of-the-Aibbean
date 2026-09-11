@@ -14,13 +14,13 @@ from app.services.tutorial import EXPECTED_OUTPUT, TutorialCodeError, run_tutori
 
 router = APIRouter(prefix="/game", tags=["game"])
 
-TUTORIAL_KEYS = ("tutorial_linear_1", "tutorial_linear_2")
+TUTORIAL_KEYS = ("tutorial_linear_1", "tutorial_linear_2", "tutorial_if_1", "tutorial_if_2")
 
 
 def _tutorial_state(progress: UserProgress) -> TutorialState:
     keys = {unlock.key for unlock in progress.unlocks}
     completed = [number for number, key in enumerate(TUTORIAL_KEYS, 1) if key in keys]
-    current_task = next((number for number in (1, 2) if number not in completed), None)
+    current_task = next((number for number in range(1, 5) if number not in completed), None)
     return TutorialState(current_task=current_task, completed=completed)
 
 
@@ -42,15 +42,19 @@ def check_tutorial(
     if progress is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Progress not found")
     state = _tutorial_state(progress)
-    if payload.task not in (1, 2) or payload.task != state.current_task:
+    if payload.task not in range(1, 5) or payload.task != state.current_task:
         raise HTTPException(status.HTTP_409_CONFLICT, "Complete tutorial tasks in order")
     try:
-        output = run_tutorial_code(payload.code)
+        output = run_tutorial_code(payload.code, require_if=payload.task in (3, 4))
     except TutorialCodeError as exc:
         return TutorialResult(**state.model_dump(), correct=False, output="", error=str(exc))
     correct = output == EXPECTED_OUTPUT[payload.task]
     if correct:
         db.add(UserUnlock(progress_id=progress.id, key=TUTORIAL_KEYS[payload.task - 1]))
+        if payload.task == 4:
+            # The final task and movement are persisted in one transaction.  There is
+            # intentionally no client endpoint that can grant this unlock directly.
+            db.add(UserUnlock(progress_id=progress.id, key="movement"))
         db.commit()
         db.refresh(progress)
         state = _tutorial_state(progress)
