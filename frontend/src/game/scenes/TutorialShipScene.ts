@@ -1,6 +1,9 @@
 import Phaser from 'phaser'
 import type { GamePythonBridge } from '../GamePythonBridge'
 import type { SceneLifecycleCallbacks } from '../createGame'
+import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled } from '../../devDiagnostics'
+
+const updateTiming = new DevTiming('Phaser TutorialShipScene update')
 import { GameKeyboardState } from '../gameKeyboard'
 
 export const TUTORIAL_CABIN = { x: 50, y: 35, width: 800, height: 490 } as const
@@ -11,6 +14,7 @@ export class TutorialShipScene extends Phaser.Scene {
   private keys!: GameKeyboardState
   private bridge!: GamePythonBridge
   private lastTick = 0
+  private updateCount = 0
 
   constructor() { super('tutorial-ship') }
 
@@ -160,9 +164,14 @@ export class TutorialShipScene extends Phaser.Scene {
   }
 
   update(time: number) {
-    if (time - this.lastTick < 50) return
-    this.lastTick = time
-    const position = { x: this.player.x, y: this.player.y }
-    void this.bridge.tick(this.keys.snapshot(), position).then((next) => { if (next) this.player.setPosition(next.x, next.y) })
+    const started = devDiagnosticsEnabled ? performance.now() : 0
+    if (debugSwitches.disableGameLoop) return
+    if (devDiagnosticsEnabled && (++this.updateCount === 1 || this.updateCount % 100 === 0)) devCount('Phaser TutorialShipScene game tick', this.updateCount)
+    if (time - this.lastTick >= 50) {
+      this.lastTick = time
+      const position = { x: this.player.x, y: this.player.y }
+      void this.bridge.tick(this.keys.snapshot(), position).then((next) => { if (next) this.player.setPosition(next.x, next.y) })
+    }
+    if (devDiagnosticsEnabled) updateTiming.add(performance.now() - started)
   }
 }

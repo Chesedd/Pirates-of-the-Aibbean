@@ -4,17 +4,23 @@ import type { GamePythonBridge } from '../GamePythonBridge'
 import type { SceneLifecycleCallbacks } from '../createGame'
 import { GameKeyboardState } from '../gameKeyboard'
 import { configureIslandCamera, generateIslandGeometry, ISLAND_CENTER } from '../islandGeometry'
+import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled } from '../../devDiagnostics'
+
+const updateTiming = new DevTiming('Phaser IslandScene update')
+const islandTiming = new DevTiming('island generation/render')
 
 export class IslandScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Container
   private keys!: GameKeyboardState
   private bridge!: GamePythonBridge
   private lastTick = 0
+  private updateCount = 0
   constructor() {
     super('island')
   }
 
   create() {
+    const islandStarted = devDiagnosticsEnabled ? performance.now() : 0
     const island = this.registry.get('island') as Island
     const coastline = generateIslandGeometry(island.generation_seed)
 
@@ -52,6 +58,7 @@ export class IslandScene extends Phaser.Scene {
       this.keys.dispose()
       lifecycle.onShutdown(this)
     })
+    if (devDiagnosticsEnabled) islandTiming.add(performance.now() - islandStarted)
   }
 
   setKeyboardEnabled(enabled: boolean) {
@@ -63,11 +70,16 @@ export class IslandScene extends Phaser.Scene {
   }
 
   update(time: number) {
-    if (time - this.lastTick < 50) return
-    this.lastTick = time
-    const position = { x: this.player.x, y: this.player.y }
-    void this.bridge.tick(this.keys.snapshot(), position).then((next) => {
-      if (next) this.player.setPosition(next.x, next.y)
-    })
+    const started = devDiagnosticsEnabled ? performance.now() : 0
+    if (debugSwitches.disableGameLoop) return
+    if (devDiagnosticsEnabled && (++this.updateCount === 1 || this.updateCount % 100 === 0)) devCount('Phaser IslandScene game tick', this.updateCount)
+    if (time - this.lastTick >= 50) {
+      this.lastTick = time
+      const position = { x: this.player.x, y: this.player.y }
+      void this.bridge.tick(this.keys.snapshot(), position).then((next) => {
+        if (next) this.player.setPosition(next.x, next.y)
+      })
+    }
+    if (devDiagnosticsEnabled) updateTiming.add(performance.now() - started)
   }
 }

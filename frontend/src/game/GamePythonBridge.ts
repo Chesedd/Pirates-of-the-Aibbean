@@ -1,6 +1,7 @@
 import type { GameKeys, GamePosition } from '../python/pythonProtocol.js'
 import type { PythonRunner } from '../python/PythonRunner.js'
 import { pointIsInsideIsland, type Point } from './islandGeometry.js'
+import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled } from '../devDiagnostics.js'
 
 export const MAX_TICK_MOVE = 20
 
@@ -10,6 +11,9 @@ export class GamePythonBridge {
   private disposed = false
   private coastline: Point[] | null = null
   private movementUnlocked = true
+  private tickCount = 0
+  private readonly tickTiming = new DevTiming('Python game tick')
+  private readonly collisionTiming = new DevTiming('collision check')
   constructor(private readonly runner: Pick<PythonRunner, 'apply' | 'tick'>,
     private readonly onOutput: (message: string) => void = () => undefined,
     private readonly onPosition: (position: GamePosition) => void = () => undefined) {}
@@ -25,7 +29,7 @@ export class GamePythonBridge {
   }
 
   async apply(code: string) {
-    if (this.disposed) return false
+    if (this.disposed || debugSwitches.disablePython) return false
     this.active = false
     try {
       await this.runner.apply(code)
@@ -40,8 +44,10 @@ export class GamePythonBridge {
   }
 
   async tick(keys: GameKeys, position: GamePosition): Promise<GamePosition | null> {
-    if (this.disposed || !this.active || this.busy) return null
+    if (this.disposed || debugSwitches.disablePython || debugSwitches.disableGameLoop || !this.active || this.busy) return null
     this.busy = true
+    const started = devDiagnosticsEnabled ? performance.now() : 0
+    if (devDiagnosticsEnabled) devCount('Python game tick', ++this.tickCount)
     try {
       const result = await this.runner.tick(keys, position)
       if (this.disposed) return null
@@ -53,14 +59,20 @@ export class GamePythonBridge {
         x: position.x + Math.max(-MAX_TICK_MOVE, Math.min(MAX_TICK_MOVE, result.x - position.x)),
         y: position.y + Math.max(-MAX_TICK_MOVE, Math.min(MAX_TICK_MOVE, result.y - position.y)),
       }
-      if (this.coastline && !pointIsInsideIsland(next, this.coastline)) return position
+      const collisionStarted = devDiagnosticsEnabled ? performance.now() : 0
+      const outsideIsland = this.coastline ? !pointIsInsideIsland(next, this.coastline) : false
+      if (devDiagnosticsEnabled) this.collisionTiming.add(performance.now() - collisionStarted)
+      if (outsideIsland) return position
       this.onPosition(next)
       return next
     } catch (reason) {
       this.active = false
       this.onOutput((reason as Error).message)
       return null
-    } finally { this.busy = false }
+    } finally {
+      if (devDiagnosticsEnabled) this.tickTiming.add(performance.now() - started)
+      this.busy = false
+    }
   }
 
   dispose(): void {

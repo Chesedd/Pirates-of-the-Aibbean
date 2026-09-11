@@ -4,6 +4,7 @@ import { createGame } from './createGame'
 import type { Island } from '../pages/UserPage'
 import type { GamePythonBridge } from './GamePythonBridge'
 import { GameSceneLifecycle } from './GameSceneLifecycle'
+import { devCount, devDiagnosticsEnabled } from '../devDiagnostics'
 
 type GameCanvasProps = {
   island: Island
@@ -16,6 +17,8 @@ type GameCanvasProps = {
 }
 
 export const GameCanvas = memo(function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick, movementUnlocked, onJournalClick }: GameCanvasProps) {
+  const renderCount = useRef(0)
+  if (devDiagnosticsEnabled) devCount('GameCanvas container render', ++renderCount.current)
   const containerRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const lifecycleRef = useRef<GameSceneLifecycle | null>(null)

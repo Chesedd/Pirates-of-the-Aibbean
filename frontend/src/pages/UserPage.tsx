@@ -6,6 +6,7 @@ import { CodeArea } from '../components/CodeArea'
 import { createBrowserPythonRunner } from '../python/PythonRunner'
 import { GamePythonBridge } from '../game/GamePythonBridge'
 import { TutorialJournal, type TutorialState } from '../components/TutorialJournal'
+import { debugSwitches } from '../devDiagnostics'
 
 export type Island = { id: number; generation_seed: number; player: { x: number; y: number } }
 export type Progress = { unlocks: string[] }
@@ -26,6 +27,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
     const runner = createBrowserPythonRunner()
     let lastSave = 0
     const bridge = new GamePythonBridge(runner, setOutput, (position) => {
+      if (debugSwitches.disableGameLoop) return
       if (Date.now() - lastSave < 5_000) return
       lastSave = Date.now()
       void apiRequest('/game/position', { method: 'PUT', body: JSON.stringify(position) })

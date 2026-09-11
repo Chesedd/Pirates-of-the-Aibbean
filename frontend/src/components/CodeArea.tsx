@@ -5,6 +5,7 @@ import type { PythonRunner } from '../python/PythonRunner'
 import type { GamePythonBridge } from '../game/GamePythonBridge'
 import type { PythonRuntimeState } from '../python/pythonProtocol'
 import { bindEditorKeyboardFocus } from './editorKeyboardFocus'
+import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled } from '../devDiagnostics'
 
 type CodeResponse = { code: string }
 type SaveState = 'loading' | 'saved' | 'unsaved' | 'saving'
@@ -25,6 +26,8 @@ const CodeEditor = memo(function CodeEditor({ initialCode, editorRef, onChange, 
   onChange: () => void
   onMount: OnMount
 }) {
+  const renderCount = useRef(0)
+  if (devDiagnosticsEnabled) devCount('CodeEditor render', ++renderCount.current)
   const options = useMemo(() => ({
     minimap: { enabled: false },
     codeLens: false,
@@ -38,7 +41,7 @@ const CodeEditor = memo(function CodeEditor({ initialCode, editorRef, onChange, 
     insertSpaces: true,
     tabSize: 4,
     detectIndentation: false,
-    renderValidationDecorations: 'on' as const,
+    renderValidationDecorations: debugSwitches.disableDecorations ? 'off' as const : 'on' as const,
   }), [])
 
   return <Editor
@@ -60,6 +63,10 @@ export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isO
   const statusRef = useRef<HTMLSpanElement | null>(null)
   const saveStateRef = useRef<SaveState>('loading')
   const renderCount = useRef(0)
+  const changeCount = useRef(0)
+  const lastKeyDown = useRef<number | null>(null)
+  const changeTiming = useRef(new DevTiming('Monaco onChange')).current
+  const keyTiming = useRef(new DevTiming('keydown -> Monaco callback complete')).current
   const [initialCode, setInitialCode] = useState<string | null>(null)
   const [state, setState] = useState<SaveState>('loading')
   const [error, setError] = useState('')
@@ -67,10 +74,7 @@ export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isO
   const [isRunning, setIsRunning] = useState(false)
   const [output, setOutput] = useState('')
 
-  if (import.meta.env.DEV) {
-    renderCount.current += 1
-    console.debug(`[CodeArea] render #${renderCount.current}`)
-  }
+  if (import.meta.env.DEV && devDiagnosticsEnabled) devCount('CodeArea render', ++renderCount.current)
 
   useEffect(() => {
     const unsubscribe = runner.subscribe(setRuntimeState)
@@ -95,21 +99,30 @@ export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isO
   }, [])
 
   const handleEditorChange = useCallback(() => {
-    const started = import.meta.env.DEV ? performance.now() : 0
+    const started = devDiagnosticsEnabled ? performance.now() : 0
     // Keep keystrokes entirely inside Monaco: refs and this DOM label do not render React.
     saveStateRef.current = 'unsaved'
     if (statusRef.current) {
       statusRef.current.textContent = 'Unsaved changes'
       statusRef.current.classList.remove('error')
     }
-    if (import.meta.env.DEV) console.debug(`[CodeArea] Monaco onChange ${(performance.now() - started).toFixed(3)}ms`)
-  }, [])
+    if (devDiagnosticsEnabled) {
+      changeCount.current += 1
+      const completed = performance.now()
+      changeTiming.add(completed - started)
+      if (lastKeyDown.current !== null) keyTiming.add(completed - lastKeyDown.current)
+      console.debug(`[diagnostics] Monaco onChange #${changeCount.current}`)
+      lastKeyDown.current = null
+    }
+  }, [changeTiming, keyTiming])
 
   const handleMount = useCallback<OnMount>((editor) => {
     const focusBinding = bindEditorKeyboardFocus(editor, onEditorFocusChange)
+    const keyBinding = devDiagnosticsEnabled ? editor.onKeyDown(() => { lastKeyDown.current = performance.now() }) : null
     editor.onDidDispose(() => {
       editorRef.current = null
       focusBinding.dispose()
+      keyBinding?.dispose()
     })
   }, [onEditorFocusChange])
 
