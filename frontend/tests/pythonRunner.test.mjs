@@ -35,6 +35,44 @@ const setup = (timeout = 100) => {
   return { runner, workers }
 }
 
+test('an initial fatal error is terminal until an explicit retry succeeds', () => {
+  const workers = []
+  const originalConsoleError = console.error
+  const diagnostics = []
+  console.error = (message) => diagnostics.push(message)
+  const runner = new PythonRunner(() => {
+    const worker = new MockWorker()
+    workers.push(worker)
+    return worker
+  })
+
+  try {
+    workers[0].emit({ type: 'fatal', error: 'Failed to fetch pyodide.asm.wasm' })
+    assert.equal(runner.runtimeState, 'error')
+    assert.equal(runner.runtimeError, 'Failed to fetch pyodide.asm.wasm')
+    assert.equal(workers[0].terminated, true)
+    assert.equal(workers.length, 1, 'fatal must not automatically create another worker')
+    assert.deepEqual(diagnostics, ['Python failed to load: Failed to fetch pyodide.asm.wasm'])
+    assert.rejects(runner.run('print("unavailable")'), /not ready/)
+
+    runner.retry()
+    assert.equal(workers.length, 2)
+    assert.equal(runner.runtimeState, 'loading')
+    workers[1].emit({ type: 'ready' })
+    assert.equal(runner.runtimeState, 'ready')
+  } finally {
+    console.error = originalConsoleError
+    runner.dispose()
+  }
+})
+
+test('retry is ignored unless initialization has failed', () => {
+  const { runner, workers } = setup()
+  runner.retry()
+  assert.equal(workers.length, 1)
+  runner.dispose()
+})
+
 test('resolves a successful result and stdout', async () => {
   const { runner, workers } = setup()
   const execution = runner.run('print("Hello")\n2 + 3')

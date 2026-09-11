@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../api/client'
 import type { User } from '../app/App'
 import { GameCanvas } from '../game/GameCanvas'
@@ -13,15 +13,21 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
   const [output, setOutput] = useState('')
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [isEditorFocused, setIsEditorFocused] = useState(false)
-  const [runner] = useState(() => createBrowserPythonRunner())
-  const [bridge] = useState(() => {
+  // Unlike a useState initializer, this guarded ref initialization is not invoked
+  // twice by React StrictMode's development render check.
+  const runnerRef = useRef<ReturnType<typeof createBrowserPythonRunner> | null>(null)
+  if (!runnerRef.current) runnerRef.current = createBrowserPythonRunner()
+  const runner = runnerRef.current
+  const bridgeRef = useRef<GamePythonBridge | null>(null)
+  if (!bridgeRef.current) {
     let lastSave = 0
-    return new GamePythonBridge(runner, setOutput, (position) => {
+    bridgeRef.current = new GamePythonBridge(runner, setOutput, (position) => {
       if (Date.now() - lastSave < 5_000) return
       lastSave = Date.now()
       void apiRequest('/game/position', { method: 'PUT', body: JSON.stringify(position) })
     })
-  })
+  }
+  const bridge = bridgeRef.current
 
   useEffect(() => () => runner.dispose(), [runner])
 

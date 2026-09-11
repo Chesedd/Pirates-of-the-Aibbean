@@ -46,6 +46,7 @@ export class PythonRunner {
   private pending: PendingRun | null = null
   private nextId = 1
   private state: PythonRuntimeState = 'loading'
+  private initializationError = ''
   private listeners = new Set<(state: PythonRuntimeState) => void>()
 
   constructor(
@@ -57,6 +58,15 @@ export class PythonRunner {
 
   get runtimeState() {
     return this.state
+  }
+
+  get runtimeError() {
+    return this.initializationError
+  }
+
+  retry() {
+    if (this.state !== 'error') return
+    this.startWorker()
   }
 
   subscribe(listener: (state: PythonRuntimeState) => void) {
@@ -105,14 +115,17 @@ export class PythonRunner {
   }
 
   private startWorker() {
+    this.initializationError = ''
     this.setState('loading')
     const worker = this.createWorker()
     this.worker = worker
     worker.onmessage = (event) => this.handleMessage(worker, event.data)
     worker.onerror = (event) => {
       if (worker !== this.worker) return
-      this.rejectPending(new Error(event.message || 'Python worker failed.'))
-      this.restartWorker()
+      const error = new Error(event.message || 'Python worker failed.')
+      this.rejectPending(error)
+      if (this.state === 'loading') this.failInitialization(worker, error.message)
+      else this.restartWorker()
     }
   }
 
@@ -124,8 +137,8 @@ export class PythonRunner {
       return
     }
     if (message.type === 'fatal') {
-      this.rejectPending(new Error(`Could not load Python: ${message.error}`))
-      this.restartWorker()
+      this.rejectPending(new Error(`Python failed to load: ${message.error}`))
+      this.failInitialization(worker, message.error)
       return
     }
     if (!this.pending || message.runId !== this.pending.id) return
@@ -159,6 +172,15 @@ export class PythonRunner {
     this.worker?.terminate()
     this.worker = null
     this.startWorker()
+  }
+
+  private failInitialization(worker: WorkerLike, reason: string) {
+    if (worker !== this.worker) return
+    this.initializationError = reason
+    console.error(`Python failed to load: ${reason}`)
+    worker.terminate()
+    this.worker = null
+    this.setState('error')
   }
 
   private setState(state: PythonRuntimeState) {

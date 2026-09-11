@@ -1,9 +1,11 @@
 /// <reference lib="webworker" />
 
+import { loadPyodide } from 'pyodide'
 import type { PythonWorkerRequest, PythonWorkerResponse } from './pythonProtocol'
 
-const PYODIDE_VERSION = '0.28.2'
-const PYODIDE_BASE_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`
+// Vite serves the npm package's core WASM, stdlib and lock file at this same-origin
+// base path. Optional ML package artifacts can be self-hosted alongside them later.
+const PYODIDE_BASE_URL = new URL(import.meta.env.BASE_URL, self.location.origin).href
 
 type PyProxy = {
   destroy?: () => void
@@ -19,20 +21,13 @@ type Pyodide = {
   setStderr: (options: { batched: (text: string) => void }) => void
 }
 
-type PyodideModule = {
-  loadPyodide: (options: { indexURL: string }) => Promise<Pyodide>
-}
-
 const send = (message: PythonWorkerResponse) => self.postMessage(message)
 
 let pyodide: Pyodide
 let gameCode: PyProxy | null = null
 
 async function initialise() {
-  // The URL is fixed and never contains user input. @vite-ignore keeps Pyodide and
-  // its large WASM assets out of the application bundle and loads them in this worker.
-  const module = await import(/* @vite-ignore */ `${PYODIDE_BASE_URL}pyodide.mjs`) as PyodideModule
-  pyodide = await module.loadPyodide({ indexURL: PYODIDE_BASE_URL })
+  pyodide = await loadPyodide({ indexURL: PYODIDE_BASE_URL }) as unknown as Pyodide
   send({ type: 'ready' })
 }
 
