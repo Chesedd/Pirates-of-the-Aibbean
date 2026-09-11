@@ -52,6 +52,41 @@ test('journal uses sequential task tabs and progressive theory', () => {
   assert.match(journal, /reachedStage >= 3/)
 })
 
+test('tutorial uses the existing Monaco Python editor with Python indentation', () => {
+  assert.match(journal, /from '@monaco-editor\/react'/)
+  assert.match(journal, /language="python"/)
+  assert.match(journal, /tabSize: 4/)
+  assert.match(journal, /insertSpaces: true/)
+  assert.match(journal, /tabFocusMode: false/)
+  assert.match(journal, /autoIndent: 'full'/)
+  assert.match(journal, /minimap: \{ enabled: false \}/)
+  assert.match(journal, /bindEditorKeyboardFocus/)
+  assert.match(page, /onEditorFocusChange=\{setIsEditorFocused\}/)
+  assert.match(page, /keyboardEnabled=\{!isEditorFocused\}/)
+})
+
+test('tutorial drafts survive theory navigation without controlled Monaco rewrites', () => {
+  assert.match(journal, /const drafts = useRef/)
+  assert.match(journal, /drafts\.current\[taskNumber\]/)
+  assert.match(journal, /defaultValue=\{initialCode\}/)
+  assert.doesNotMatch(journal, /<Editor[^>]*\svalue=\{/)
+})
+
+test('typing only updates the local draft and checking alone calls the evaluator', () => {
+  const editorComponent = journal.slice(journal.indexOf('function TutorialCodeEditor'))
+  const changeHandler = editorComponent.match(/onChange=\{\(value\) => \{([\s\S]*?)\n      \}\}/)?.[1] ?? ''
+  assert.match(changeHandler, /onChange\(code\)/)
+  assert.doesNotMatch(changeHandler, /apiRequest|check\(/)
+  assert.match(journal, /async function check\(\)/)
+  assert.match(journal, /apiRequest<TutorialResult>\('\/game\/tutorial\/check'/)
+  assert.match(journal, /onClick=\{\(\) => void check\(\)\}/)
+})
+
+test('requested theory wording is shown without an extra knowledge caption', () => {
+  assert.doesNotMatch(journal, /Открытые знания/)
+  assert.match(journal, /Переменная хранит какое-то значение\./)
+})
+
 test('cabin object labels and pirate journal emblem are removed', () => {
   assert.doesNotMatch(scene, /'ГАМАК'|'ЖУРНАЛ'|'ВЫХОД'|☠/)
   assert.match(scene, /compass\.lineStyle/)

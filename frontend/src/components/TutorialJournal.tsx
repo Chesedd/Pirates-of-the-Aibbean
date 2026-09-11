@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import Editor from '@monaco-editor/react'
+import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../api/client'
+import { bindEditorKeyboardFocus } from './editorKeyboardFocus'
 
 export type TutorialState = { current_task: number | null; completed: number[] }
 type TutorialResult = TutorialState & { correct: boolean; output: string; error: string | null }
@@ -34,15 +36,16 @@ const tasks = {
 
 const roman = ['I', 'II', 'III', 'IV'] as const
 
-export function TutorialJournal({ initialState, onClose, onProgress, onFinished }: {
+export function TutorialJournal({ initialState, onClose, onProgress, onFinished, onEditorFocusChange }: {
   initialState: TutorialState
   onClose: () => void
   onProgress: (state: TutorialState) => void
   onFinished: () => void
+  onEditorFocusChange: (focused: boolean) => void
 }) {
   const [state, setState] = useState(initialState)
   const [selectedTab, setSelectedTab] = useState<JournalTab>(initialState.current_task as JournalTab || 'final')
-  const [drafts, setDrafts] = useState<Partial<Record<1 | 2 | 3 | 4, string>>>({})
+  const drafts = useRef<Partial<Record<1 | 2 | 3 | 4, string>>>({})
   const [result, setResult] = useState('')
   const [checking, setChecking] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -53,7 +56,6 @@ export function TutorialJournal({ initialState, onClose, onProgress, onFinished 
   const taskNumber = typeof selectedTab === 'number' ? selectedTab : null
   const displayedTask = taskNumber ?? 1
   const task = taskNumber ? tasks[taskNumber] : null
-  const code = taskNumber ? drafts[taskNumber] ?? '' : ''
   const reachedStage = allComplete ? 4 : Math.max(currentTask ?? 1, ...state.completed, 1)
 
   function selectTab(tab: JournalTab) {
@@ -64,6 +66,7 @@ export function TutorialJournal({ initialState, onClose, onProgress, onFinished 
 
   async function check() {
     if (!taskNumber || taskNumber !== currentTask || checking) return
+    const code = drafts.current[taskNumber] ?? ''
     setChecking(true)
     setResult('')
     try {
@@ -114,8 +117,8 @@ export function TutorialJournal({ initialState, onClose, onProgress, onFinished 
           <article className="journal-page journal-work">
             <div className="journal-page-caption"><span>Рабочая запись</span>{state.completed.includes(displayedTask) && <span className="completed-mark">выполнено ✓</span>}</div>
             <label htmlFor={`tutorial-code-${taskNumber}`}>Python</label>
-            <textarea id={`tutorial-code-${taskNumber}`} className="tutorial-editor" value={code} onChange={(event) => setDrafts((current) => ({ ...current, [displayedTask]: event.target.value }))} spellCheck={false} placeholder="# Восстанови запись здесь…" />
-            {taskNumber === currentTask ? <button className="journal-check" type="button" onClick={() => void check()} disabled={checking || !code.trim()}>{checking ? 'Проверяем…' : 'Проверить запись'}</button> : <p className="revisit-note">Эта запись уже восстановлена. Её можно перечитать и изменить черновик.</p>}
+            <TutorialCodeEditor task={displayedTask} initialCode={drafts.current[displayedTask] ?? ''} onChange={(value) => { drafts.current[displayedTask] = value }} onFocusChange={onEditorFocusChange} />
+            {taskNumber === currentTask ? <button className="journal-check" type="button" onClick={() => void check()} disabled={checking}>{checking ? 'Проверяем…' : 'Проверить запись'}</button> : <p className="revisit-note">Эта запись уже восстановлена. Её можно перечитать и изменить черновик.</p>}
             <div className={`tutorial-result ${result ? 'visible' : ''}`} role="status">{result || 'Здесь появится результат проверки.'}</div>
           </article>
         </div> : null}
@@ -126,8 +129,48 @@ export function TutorialJournal({ initialState, onClose, onProgress, onFinished 
 
 function TheorySpread({ reachedStage }: { reachedStage: number }) {
   return <div className="journal-spread theory-spread">
-    <article className="journal-page"><p className="journal-entry">Открытые знания</p><h3>Капитанские заметки</h3><TheoryNote title="Переменные" code="water = 7">Переменная хранит значение под именем.</TheoryNote><TheoryNote title="Арифметика" code="total = water + food">Значения переменных можно использовать в вычислениях.</TheoryNote><TheoryNote title="print" code="print(total)"><code>print()</code> показывает результат работы программы.</TheoryNote></article>
+    <article className="journal-page"><h3>Капитанские заметки</h3><TheoryNote title="Переменные" code="water = 7">Переменная хранит какое-то значение.</TheoryNote><TheoryNote title="Арифметика" code="total = water + food">Значения переменных можно использовать в вычислениях.</TheoryNote><TheoryNote title="print" code="print(total)"><code>print()</code> показывает результат работы программы.</TheoryNote></article>
     <article className="journal-page"><p className="journal-page-number">II</p>{reachedStage >= 2 ? <TheoryNote title="Изменение значения" code={'x = x + 5\nx += 5'}>Обе записи увеличивают <code>x</code> на 5. Вторая — короткая форма.</TheoryNote> : <LockedTheory />}{reachedStage >= 3 ? <TheoryNote title="Условие if" code={'if water < 10:\n    print("refill")'}>Код внутри <code>if</code> выполняется только тогда, когда условие истинно.</TheoryNote> : <LockedTheory />}</article>
+  </div>
+}
+
+function TutorialCodeEditor({ task, initialCode, onChange, onFocusChange }: {
+  task: 1 | 2 | 3 | 4
+  initialCode: string
+  onChange: (value: string) => void
+  onFocusChange: (focused: boolean) => void
+}) {
+  useEffect(() => () => onFocusChange(false), [onFocusChange])
+  return <div className="tutorial-editor" data-testid="tutorial-python-editor">
+    <Editor
+      language="python"
+      theme="vs-dark"
+      defaultValue={initialCode}
+      loading="Загрузка редактора…"
+      onChange={(value) => {
+        const code = value ?? ''
+        onChange(code)
+      }}
+      onMount={(editor) => {
+        const focusBinding = bindEditorKeyboardFocus(editor, onFocusChange)
+        editor.onDidDispose(() => focusBinding.dispose())
+      }}
+      options={{
+        automaticLayout: true,
+        fontSize: 15,
+        insertSpaces: true,
+        tabSize: 4,
+        tabFocusMode: false,
+        autoIndent: 'full',
+        detectIndentation: false,
+        minimap: { enabled: false },
+        overviewRulerLanes: 0,
+        scrollBeyondLastLine: false,
+        quickSuggestions: false,
+        wordWrap: 'on',
+        ariaLabel: `Python, запись ${task}`,
+      }}
+    />
   </div>
 }
 
