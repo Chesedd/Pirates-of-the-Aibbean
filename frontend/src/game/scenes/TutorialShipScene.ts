@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import type { GamePythonBridge } from '../GamePythonBridge'
 import type { SceneLifecycleCallbacks } from '../createGame'
-import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled } from '../../devDiagnostics'
+import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordPhaserUpdate } from '../../devDiagnostics'
 
 const updateTiming = new DevTiming('Phaser TutorialShipScene update')
 import { GameKeyboardState } from '../gameKeyboard'
@@ -172,6 +172,10 @@ export class TutorialShipScene extends Phaser.Scene {
       const position = { x: this.player.x, y: this.player.y }
       void this.bridge.tick(this.keys.snapshot(), position).then((next) => { if (next) this.player.setPosition(next.x, next.y) })
     }
-    if (devDiagnosticsEnabled) updateTiming.add(performance.now() - started)
+    if (devDiagnosticsEnabled) {
+      const duration = performance.now() - started
+      updateTiming.add(duration)
+      recordPhaserUpdate(duration)
+    }
   }
 }
