@@ -2,6 +2,7 @@
 
 import { loadPyodide } from 'pyodide'
 import type { PythonWorkerRequest, PythonWorkerResponse } from './pythonProtocol'
+import { buildGamePrelude } from './pythonPrelude'
 
 // Vite serves the npm package's core WASM, stdlib and lock file at this same-origin
 // base path. Optional ML package artifacts can be self-hosted alongside them later.
@@ -52,7 +53,7 @@ self.onmessage = async (event: MessageEvent<PythonWorkerRequest>) => {
     if (event.data.type === 'tick') {
       if (!gameCode) throw new Error('No game program has been applied.')
       const { keys, position } = event.data
-      const prelude = `x=${JSON.stringify(position.x)}\ny=${JSON.stringify(position.y)}\n_keys=${JSON.stringify(keys)}\ndef key_pressed(key):\n return bool(_keys.get(key, False))`
+      const prelude = buildGamePrelude(keys, position)
       await pyodide.runPythonAsync(prelude, { globals })
       globals.set?.('__game_code', gameCode)
       await pyodide.runPythonAsync('exec(__game_code)', { globals })

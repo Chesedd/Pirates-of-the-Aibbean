@@ -7,6 +7,7 @@ export const MAX_TICK_MOVE = 20
 export class GamePythonBridge {
   private active = false
   private busy = false
+  private disposed = false
   private coastline: Point[] | null = null
   constructor(private readonly runner: Pick<PythonRunner, 'apply' | 'tick'>,
     private readonly onOutput: (message: string) => void = () => undefined,
@@ -18,16 +19,26 @@ export class GamePythonBridge {
   }
 
   async apply(code: string) {
+    if (this.disposed) return false
     this.active = false
-    try { await this.runner.apply(code); this.active = true; this.onOutput(''); return true }
-    catch (reason) { this.onOutput((reason as Error).message); return false }
+    try {
+      await this.runner.apply(code)
+      if (this.disposed) return false
+      this.active = true
+      this.onOutput('')
+      return true
+    } catch (reason) {
+      if (!this.disposed) this.onOutput((reason as Error).message)
+      return false
+    }
   }
 
   async tick(keys: GameKeys, position: GamePosition): Promise<GamePosition | null> {
-    if (!this.active || this.busy) return null
+    if (this.disposed || !this.active || this.busy) return null
     this.busy = true
     try {
       const result = await this.runner.tick(keys, position)
+      if (this.disposed) return null
       if (result.stdout) this.onOutput(result.stdout)
       if (typeof result.x !== 'number' || typeof result.y !== 'number' ||
           !Number.isFinite(result.x) || !Number.isFinite(result.y)) throw new Error('player.py returned invalid coordinates.')
@@ -43,5 +54,10 @@ export class GamePythonBridge {
       this.onOutput((reason as Error).message)
       return null
     } finally { this.busy = false }
+  }
+
+  dispose(): void {
+    this.disposed = true
+    this.active = false
   }
 }
