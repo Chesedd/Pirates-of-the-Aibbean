@@ -11,9 +11,11 @@ type GameCanvasProps = {
   username: string
   keyboardEnabled: boolean
   onPlayerClick: () => void
+  movementUnlocked: boolean
+  onJournalClick: () => void
 }
 
-export function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick }: GameCanvasProps) {
+export function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick, movementUnlocked, onJournalClick }: GameCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const lifecycleRef = useRef<GameSceneLifecycle | null>(null)
@@ -25,7 +27,7 @@ export function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayer
 
     const lifecycle = new GameSceneLifecycle(keyboardEnabledRef.current)
     lifecycleRef.current = lifecycle
-    const game = createGame(containerRef.current, island, bridge, username, onPlayerClick, {
+    const game = createGame(containerRef.current, island, bridge, username, onPlayerClick, movementUnlocked, onJournalClick, {
       onReady: (scene) => lifecycle.sceneReady(scene),
       onShutdown: (scene) => lifecycle.sceneShutdown(scene),
     })
@@ -39,13 +41,13 @@ export function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayer
       if (gameRef.current === game) gameRef.current = null
       game.destroy(true)
     }
-  }, [island, bridge, username, onPlayerClick])
+  }, [island, bridge, username, onPlayerClick, movementUnlocked, onJournalClick])
 
   useEffect(() => {
     lifecycleRef.current?.setKeyboardEnabled(keyboardEnabled)
   }, [keyboardEnabled])
 
-  return <div className="game-canvas" ref={containerRef} aria-label="Your island game view" />
+  return <div className="game-canvas" ref={containerRef} aria-label={movementUnlocked ? 'Your island game view' : 'Tutorial ship cabin'} />
 }
 
 export type PhaserGame = Phaser.Game

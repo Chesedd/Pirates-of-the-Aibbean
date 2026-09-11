@@ -43,6 +43,26 @@ test('excessive movement is clamped', async () => {
   assert.deepEqual(await bridge.tick(keys, position), { x: position.x + MAX_TICK_MOVE, y: position.y - MAX_TICK_MOVE })
 })
 
+test('locked movement still runs player Python but preserves coordinates', async () => {
+  let ticks = 0
+  const runner = { apply: async () => {}, tick: async () => { ticks += 1; return { x: 120, y: 80, stdout: '' } } }
+  const bridge = new GamePythonBridge(runner)
+  bridge.setMovementUnlocked(false)
+  await bridge.apply('x += 20')
+  assert.deepEqual(await bridge.tick(keys, position), position)
+  assert.equal(ticks, 1)
+})
+
+test('movement starts working without reapplying player code after unlock', async () => {
+  const runner = { apply: async () => {}, tick: async () => ({ x: 110, y: 100, stdout: '' }) }
+  const bridge = new GamePythonBridge(runner)
+  bridge.setMovementUnlocked(false)
+  await bridge.apply('x += 10')
+  assert.deepEqual(await bridge.tick(keys, position), position)
+  bridge.setMovementUnlocked(true)
+  assert.deepEqual(await bridge.tick(keys, position), { x: 110, y: 100 })
+})
+
 test('concurrent ticks are dropped instead of queued', async () => {
   let finish
   let calls = 0

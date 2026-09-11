@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.user import Island, User
+from app.models.user import Island, User, UserProgress, UserUnlock
 from tests.test_auth import login
 
 
@@ -77,6 +77,10 @@ def test_user_can_update_only_their_own_position(client: TestClient, users, db: 
     other = create_regular_user(client, "position-owner")
     owner_island = db.scalar(select(Island).where(Island.user_id == owner["id"]))
     other_island = db.scalar(select(Island).where(Island.user_id == other["id"]))
+    owner_progress = db.scalar(select(UserProgress).where(UserProgress.user_id == owner["id"]))
+    assert owner_progress is not None
+    db.add(UserUnlock(progress_id=owner_progress.id, key="movement"))
+    db.commit()
     client.post("/auth/logout")
     login(client, "moving-player", "temporary-password")
     response = client.put(f"/game/position?user_id={other['id']}&island_id={other_island.id}", json={"x": 2610, "y": 2610})
@@ -85,6 +89,37 @@ def test_user_can_update_only_their_own_position(client: TestClient, users, db: 
     db.refresh(other_island)
     assert (owner_island.player_x, owner_island.player_y) == (2610, 2610)
     assert (other_island.player_x, other_island.player_y) == (2600, 2600)
+
+
+def test_position_is_unchanged_without_movement_unlock_even_after_refresh(
+    client: TestClient, users, db: Session
+) -> None:
+    login(client)
+    created = create_regular_user(client, "tutorial-player")
+    client.post("/auth/logout")
+    login(client, "tutorial-player", "temporary-password")
+
+    first_attempt = client.put("/game/position", json={"x": 2620, "y": 2610})
+    assert first_attempt.status_code == 200
+    assert first_attempt.json()["player"] == {"x": 2600, "y": 2600}
+    assert client.get("/game/island").json()["player"] == {"x": 2600, "y": 2600}
+    island = db.scalar(select(Island).where(Island.user_id == created["id"]))
+    assert island is not None and (island.player_x, island.player_y) == (2600, 2600)
+
+
+def test_position_changes_after_movement_unlock(client: TestClient, users, db: Session) -> None:
+    login(client)
+    created = create_regular_user(client, "unlocked-player")
+    progress = db.scalar(select(UserProgress).where(UserProgress.user_id == created["id"]))
+    assert progress is not None
+    db.add(UserUnlock(progress_id=progress.id, key="movement"))
+    db.commit()
+    client.post("/auth/logout")
+    login(client, "unlocked-player", "temporary-password")
+
+    response = client.put("/game/position", json={"x": 2620, "y": 2610})
+    assert response.status_code == 200
+    assert response.json()["player"] == {"x": 2620, "y": 2610}
 
 
 def test_island_seed_is_stable_across_repeated_requests(client: TestClient, users, db: Session) -> None:
@@ -102,6 +137,10 @@ def test_island_seed_is_stable_across_repeated_requests(client: TestClient, user
 def test_position_outside_island_is_not_saved(client: TestClient, users, db: Session) -> None:
     login(client)
     created = create_regular_user(client, "bounded-player")
+    progress = db.scalar(select(UserProgress).where(UserProgress.user_id == created["id"]))
+    assert progress is not None
+    db.add(UserUnlock(progress_id=progress.id, key="movement"))
+    db.commit()
     client.post("/auth/logout")
     login(client, "bounded-player", "temporary-password")
     response = client.put("/game/position", json={"x": -10000, "y": -10000})
