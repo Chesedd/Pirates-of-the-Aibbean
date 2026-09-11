@@ -13,6 +13,9 @@ export const debugSwitches = {
   disableGameLoop: query.get('disableGameLoop') === 'true',
   disablePython: query.get('disablePython') === 'true',
   disableDecorations: query.get('disableDecorations') === 'true',
+  disableRendering: query.get('disableRendering') === 'true',
+  disableScene: query.get('disableScene') === 'true',
+  staticIsland: query.get('staticIsland') === 'true',
 } as const
 
 export type EditorDiagnosticMode = 'textarea' | 'minimal Monaco' | 'full Monaco'
@@ -81,4 +84,88 @@ export class DevTiming {
 
 export function devCount(label: string, count: number): void {
   if (devDiagnosticsEnabled) console.debug(`[diagnostics] ${label} #${count}`)
+}
+
+type PhaserDiagnosticSample = 'update' | 'render' | 'frame' | 'rafGap'
+
+const phaserSamples: Record<PhaserDiagnosticSample, number[]> = {
+  update: [], render: [], frame: [], rafGap: [],
+}
+
+function addPhaserSample(kind: PhaserDiagnosticSample, duration: number): void {
+  const samples = phaserSamples[kind]
+  samples.push(duration)
+  if (samples.length > 300) samples.shift()
+}
+
+/** Called by scenes so the UI reports only Scene.update, not the whole Phaser step. */
+export function recordPhaserUpdate(duration: number): void {
+  if (devDiagnosticsEnabled) addPhaserSample('update', duration)
+}
+
+/** Adds a dev-only, DOM-independent probe around Phaser's update and render phases. */
+export function installPhaserDiagnostics(game: import('phaser').Game, host: HTMLElement): () => void {
+  if (!devDiagnosticsEnabled) return () => undefined
+  const output = document.createElement('output')
+  output.className = 'phaser-diagnostics'
+  output.setAttribute('aria-live', 'off')
+  host.append(output)
+
+  let frameStarted = 0
+  let renderStarted = 0
+  let lastRaf = 0
+  let rafId = 0
+  let reportTimer = 0
+  const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / Math.max(values.length, 1)
+  const mark = (name: string) => performance.mark(name)
+  const preStep = () => {
+    frameStarted = performance.now()
+    mark('phaser-update-start')
+  }
+  const postStep = () => mark('phaser-update-end')
+  const preRender = () => {
+    renderStarted = performance.now()
+    mark('phaser-render-start')
+  }
+  const postRender = () => {
+    const now = performance.now()
+    addPhaserSample('render', now - renderStarted)
+    addPhaserSample('frame', now - frameStarted)
+    mark('phaser-render-end')
+  }
+  const rafProbe = (now: number) => {
+    if (lastRaf) addPhaserSample('rafGap', now - lastRaf)
+    lastRaf = now
+    rafId = requestAnimationFrame(rafProbe)
+  }
+  const report = () => {
+    const gaps = phaserSamples.rafGap
+    const fps = gaps.length ? 1000 / average(gaps) : 0
+    const longFrames = phaserSamples.frame.filter((duration) => duration > 16).length
+    output.textContent = [
+      `Phaser update avg: ${average(phaserSamples.update).toFixed(2)} ms`,
+      `Phaser render avg: ${average(phaserSamples.render).toFixed(2)} ms`,
+      `FPS: ${fps.toFixed(1)}`,
+      `Long frames (>16ms): ${longFrames}/${phaserSamples.frame.length}`,
+      `Frame work avg: ${average(phaserSamples.frame).toFixed(2)} ms`,
+      `rAF interval avg: ${average(gaps).toFixed(2)} ms`,
+    ].join('\n')
+  }
+
+  game.events.on('prestep', preStep)
+  game.events.on('poststep', postStep)
+  game.events.on('prerender', preRender)
+  game.events.on('postrender', postRender)
+  rafId = requestAnimationFrame(rafProbe)
+  reportTimer = window.setInterval(report, 500)
+  report()
+  return () => {
+    game.events.off('prestep', preStep)
+    game.events.off('poststep', postStep)
+    game.events.off('prerender', preRender)
+    game.events.off('postrender', postRender)
+    cancelAnimationFrame(rafId)
+    clearInterval(reportTimer)
+    output.remove()
+  }
 }

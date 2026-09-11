@@ -4,7 +4,7 @@ import { createGame } from './createGame'
 import type { Island } from '../pages/UserPage'
 import type { GamePythonBridge } from './GamePythonBridge'
 import { GameSceneLifecycle } from './GameSceneLifecycle'
-import { devCount, devDiagnosticsEnabled } from '../devDiagnostics'
+import { devCount, devDiagnosticsEnabled, installPhaserDiagnostics } from '../devDiagnostics'
 
 type GameCanvasProps = {
   island: Island
@@ -35,11 +35,13 @@ export const GameCanvas = memo(function GameCanvas({ island, bridge, username, k
       onShutdown: (scene) => lifecycle.sceneShutdown(scene),
     })
     gameRef.current = game
+    const removeDiagnostics = installPhaserDiagnostics(game, containerRef.current)
     let cleanedUp = false
     return () => {
       if (cleanedUp) return
       cleanedUp = true
       lifecycle.dispose()
+      removeDiagnostics()
       if (lifecycleRef.current === lifecycle) lifecycleRef.current = null
       if (gameRef.current === game) gameRef.current = null
       game.destroy(true)

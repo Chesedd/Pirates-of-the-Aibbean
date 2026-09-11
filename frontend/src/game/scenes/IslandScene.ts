@@ -4,7 +4,7 @@ import type { GamePythonBridge } from '../GamePythonBridge'
 import type { SceneLifecycleCallbacks } from '../createGame'
 import { GameKeyboardState } from '../gameKeyboard'
 import { configureIslandCamera, generateIslandGeometry, ISLAND_CENTER } from '../islandGeometry'
-import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled } from '../../devDiagnostics'
+import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordPhaserUpdate } from '../../devDiagnostics'
 
 const updateTiming = new DevTiming('Phaser IslandScene update')
 const islandTiming = new DevTiming('island generation/render')
@@ -15,25 +15,17 @@ export class IslandScene extends Phaser.Scene {
   private bridge!: GamePythonBridge
   private lastTick = 0
   private updateCount = 0
+  private islandDrawn = false
   constructor() {
     super('island')
   }
 
   create() {
-    const islandStarted = devDiagnosticsEnabled ? performance.now() : 0
     const island = this.registry.get('island') as Island
     const coastline = generateIslandGeometry(island.generation_seed)
 
     this.cameras.main.setBackgroundColor(0x176b87)
-    const graphics = this.add.graphics()
-    graphics.fillStyle(0xe7c66b)
-    graphics.fillPoints(coastline, true)
-    const interior = coastline.map(({ x, y }) => ({
-      x: ISLAND_CENTER + (x - ISLAND_CENTER) * 0.965,
-      y: ISLAND_CENTER + (y - ISLAND_CENTER) * 0.965,
-    }))
-    graphics.fillStyle(0x4b9b58)
-    graphics.fillPoints(interior, true)
+    this.drawIsland(coastline)
 
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
     this.bridge.setIslandGeometry(coastline)
@@ -58,7 +50,27 @@ export class IslandScene extends Phaser.Scene {
       this.keys.dispose()
       lifecycle.onShutdown(this)
     })
-    if (devDiagnosticsEnabled) islandTiming.add(performance.now() - islandStarted)
+  }
+
+  private drawIsland(coastline: { x: number; y: number }[]) {
+    if (debugSwitches.staticIsland && this.islandDrawn) return
+    const islandStarted = devDiagnosticsEnabled ? performance.now() : 0
+    if (devDiagnosticsEnabled) performance.mark('draw-island-start')
+    const graphics = this.add.graphics()
+    graphics.fillStyle(0xe7c66b)
+    graphics.fillPoints(coastline, true)
+    const interior = coastline.map(({ x, y }) => ({
+      x: ISLAND_CENTER + (x - ISLAND_CENTER) * 0.965,
+      y: ISLAND_CENTER + (y - ISLAND_CENTER) * 0.965,
+    }))
+    graphics.fillStyle(0x4b9b58)
+    graphics.fillPoints(interior, true)
+    this.islandDrawn = true
+    if (devDiagnosticsEnabled) {
+      performance.mark('draw-island-end')
+      performance.measure('draw-island', 'draw-island-start', 'draw-island-end')
+      islandTiming.add(performance.now() - islandStarted)
+    }
   }
 
   setKeyboardEnabled(enabled: boolean) {
@@ -80,6 +92,10 @@ export class IslandScene extends Phaser.Scene {
         if (next) this.player.setPosition(next.x, next.y)
       })
     }
-    if (devDiagnosticsEnabled) updateTiming.add(performance.now() - started)
+    if (devDiagnosticsEnabled) {
+      const duration = performance.now() - started
+      updateTiming.add(duration)
+      recordPhaserUpdate(duration)
+    }
   }
 }

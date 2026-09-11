@@ -4,6 +4,7 @@ import { TutorialShipScene } from './scenes/TutorialShipScene'
 import type { Island } from '../pages/UserPage'
 import type { GamePythonBridge } from './GamePythonBridge'
 import type { KeyboardScene } from './GameSceneLifecycle'
+import { debugSwitches } from '../devDiagnostics'
 
 export type SceneLifecycleCallbacks = {
   onReady: (scene: KeyboardScene) => void
@@ -21,7 +22,8 @@ export function createGame(
   sceneLifecycle: SceneLifecycleCallbacks,
 ): Phaser.Game {
   return new Phaser.Game({
-    type: Phaser.AUTO,
+    // HEADLESS preserves scene creation and updates while removing the renderer.
+    type: debugSwitches.disableRendering ? Phaser.HEADLESS : Phaser.AUTO,
     parent,
     backgroundColor: '#176b87',
     scale: {

@@ -78,7 +78,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
       {!debugSwitches.editorOnly && <div className="game-pane">
         {error && <p className="error game-status">Could not load the island: {error}</p>}
         {!error && (!island || !progress) && <p className="game-status">Charting your course…</p>}
-        {island && progress && runtime && !debugSwitches.disableCanvas && <GameCanvas
+        {island && progress && runtime && !debugSwitches.disableCanvas && !debugSwitches.disableScene && <GameCanvas
           island={island}
           bridge={runtime.bridge}
           username={user.username}
