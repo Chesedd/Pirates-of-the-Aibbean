@@ -41,6 +41,20 @@
 
 Performance timeline получает marks `phaser-update-start/end`, `phaser-render-start/end`, `draw-island-start/end` и measure `draw-island`. Здесь `update avg` — длительность пользовательского `Scene.update`; `render avg` — интервал между core pre/post-render; `Frame work avg` — синхронная работа между Phaser pre-step и post-render; `rAF interval avg` включает время, которое прошло между browser callbacks.
 
+Overlay также показывает состояние renderer, число видимых/всех объектов, `renderer.drawCount`, среднюю input latency, реальный backing buffer canvas, CSS-размер, DPR и наличие alpha. Счётчики `Graphics.clear`, `Graphics.fillPath`, `Graphics.strokePath`, `setPosition`, `setText`, `setScale` позволяют увидеть, растёт ли какой-либо вызов во время неподвижной сцены. У приложения явно задано `transparent: false`; режим `disableWebGLPostFX=true` принудительно выбирает Canvas renderer и тем самым исключает WebGL pipelines/post-processing.
+
+| Query | Эксперимент |
+|---|---|
+| `?disablePhaserRenderer=true` | Phaser создаёт и обновляет scene в HEADLESS, canvas/render отсутствуют |
+| `?hideAllGameObjects=true` | renderer и update работают, весь display list невидим |
+| `?hideIsland=true` | исключён только остров (в tutorial — фон каюты), игрок и UI остаются |
+| `?hidePlayer=true` | скрыт только player container вместе с username |
+| `?disableCameraFollow=true` | отключены follow/viewport camera adjustments |
+| `?disableWebGLPostFX=true` | непрозрачный Canvas renderer вместо WebGL |
+| `?rendererRestartExperiment=true` | при открытии редактора render останавливается и автоматически возвращается через 3 секунды |
+
+Режимы можно комбинировать. Для строгого сравнения следует перезагружать страницу, вводить одинаковые 100+ символов и записывать `Input latency`, `Frame work`, FPS и draw calls. В restart-эксперименте подпись под overlay показывает обе фазы.
+
 ## Строгий эксперимент для установления источника
 
 В одном браузере и после одинакового прогрева сравнить latency probe (не менее 100 символов на режим):
@@ -54,4 +68,8 @@ Performance timeline получает marks `phaser-update-start/end`, `phaser-r
 
 Решающий критерий сформулирован заранее: утверждать «рендеринг Phaser является причиной» можно только если лаг воспроизводится в baseline и исчезает с `disableRendering=true`, при этом update остаётся активным. Если лаг остаётся в HEADLESS, но исчезает с `disableScene=true`, следующий минимальный probe должен измерить Phaser TimeStep/input plugins. Если не исчезает и с `disableScene=true`, причина вне Phaser, и это также будет прямым результатом, а не догадкой.
 
-На текущем этапе нельзя честно написать «при отключении X задержка исчезает»: в репозитории нет browser automation и аутентифицированной benchmark fixture, а предоставленные результаты ещё не содержат новых режимов. Поэтому внесена только минимальная диагностика и изоляция; production-сборка и архитектура не изменены.
+## Вывод текущего этапа
+
+**Причина задержки: пока не установлена экспериментально.** Статически подтверждено лишь то, что canvas непрозрачный, остров строится однократно, а `setPosition` вызывается только после ответа tick; это не является измерением input latency. Репозиторий не содержит аутентифицированной browser benchmark fixture, а результаты ручных прогонов на целевом браузере/оборудовании не предоставлены. Приписывать renderer, острову или камере исчезновение задержки без такого прогона означало бы сфабриковать результат.
+
+Диагностический стенд теперь даёт решающий эксперимент: если latency низкая в HEADLESS и в первые три секунды `rendererRestartExperiment`, а после надписи `renderer restarted` возрастает, вывод следует заменить на **«Причина задержки: Phaser renderer»**. Если помогает только `hideIsland`, причина — отрисовка острова; если `hideAllGameObjects` не помогает, display objects исключены и исследовать нужно core renderer/compositing либо другой код. Оптимизаций на этом этапе не сделано.

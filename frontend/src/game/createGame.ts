@@ -23,7 +23,9 @@ export function createGame(
 ): Phaser.Game {
   return new Phaser.Game({
     // HEADLESS preserves scene creation and updates while removing the renderer.
-    type: debugSwitches.disableRendering ? Phaser.HEADLESS : Phaser.AUTO,
+    type: debugSwitches.disablePhaserRenderer ? Phaser.HEADLESS : debugSwitches.disableWebGLPostFX ? Phaser.CANVAS : Phaser.AUTO,
+    // Explicitly opaque: no alpha compositing is requested in any normal mode.
+    transparent: false,
     parent,
     backgroundColor: '#176b87',
     scale: {

@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import type { GamePythonBridge } from '../GamePythonBridge'
 import type { SceneLifecycleCallbacks } from '../createGame'
-import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordPhaserUpdate } from '../../devDiagnostics'
+import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordGameObjectMutation, recordPhaserUpdate } from '../../devDiagnostics'
 
 const updateTiming = new DevTiming('Phaser TutorialShipScene update')
 import { GameKeyboardState } from '../gameKeyboard'
@@ -20,14 +20,21 @@ export class TutorialShipScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor(0x100b09)
-    this.drawCabin()
-    this.createJournal()
+    if (!debugSwitches.hideIsland && !debugSwitches.hideAllGameObjects) this.drawCabin()
+    if (!debugSwitches.hideAllGameObjects) this.createJournal()
     this.createPlayer()
-    this.createStoryText()
+    if (!debugSwitches.hideAllGameObjects) this.createStoryText()
+
+    if (debugSwitches.hidePlayer || debugSwitches.hideAllGameObjects) this.player.setVisible(false)
+    if (debugSwitches.hideAllGameObjects) this.children.list.forEach((child) => {
+      if ('setVisible' in child) (child as Phaser.GameObjects.GameObject & { setVisible: (visible: boolean) => void }).setVisible(false)
+    })
 
     this.cameras.main.setBounds(0, 0, 900, 560).centerOn(450, 280)
-    this.fitCabinToViewport()
-    this.scale.on(Phaser.Scale.Events.RESIZE, this.fitCabinToViewport, this)
+    if (!debugSwitches.disableCameraFollow) {
+      this.fitCabinToViewport()
+      this.scale.on(Phaser.Scale.Events.RESIZE, this.fitCabinToViewport, this)
+    }
 
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
     this.bridge.setMovementUnlocked(false)
@@ -35,7 +42,7 @@ export class TutorialShipScene extends Phaser.Scene {
     const lifecycle = this.registry.get('sceneLifecycle') as SceneLifecycleCallbacks
     lifecycle.onReady(this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.scale.off(Phaser.Scale.Events.RESIZE, this.fitCabinToViewport, this)
+      if (!debugSwitches.disableCameraFollow) this.scale.off(Phaser.Scale.Events.RESIZE, this.fitCabinToViewport, this)
       this.keys.dispose()
       lifecycle.onShutdown(this)
     })
@@ -170,7 +177,12 @@ export class TutorialShipScene extends Phaser.Scene {
     if (time - this.lastTick >= 50) {
       this.lastTick = time
       const position = { x: this.player.x, y: this.player.y }
-      void this.bridge.tick(this.keys.snapshot(), position).then((next) => { if (next) this.player.setPosition(next.x, next.y) })
+      void this.bridge.tick(this.keys.snapshot(), position).then((next) => {
+        if (next) {
+          recordGameObjectMutation('setPosition')
+          this.player.setPosition(next.x, next.y)
+        }
+      })
     }
     if (devDiagnosticsEnabled) {
       const duration = performance.now() - started

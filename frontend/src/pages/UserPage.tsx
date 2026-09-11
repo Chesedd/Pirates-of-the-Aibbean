@@ -85,6 +85,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
           keyboardEnabled={!isEditorFocused}
           onPlayerClick={openEditor}
           movementUnlocked={movementUnlocked}
+          editorOpen={isEditorOpen || journalOpen}
           onJournalClick={openJournal}
         />}
         {journalOpen && tutorial && <TutorialJournal initialState={tutorial} onClose={closeJournal} onProgress={setTutorial} onFinished={finishTutorial} onEditorFocusChange={setIsEditorFocused} />}

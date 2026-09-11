@@ -4,7 +4,7 @@ import type { GamePythonBridge } from '../GamePythonBridge'
 import type { SceneLifecycleCallbacks } from '../createGame'
 import { GameKeyboardState } from '../gameKeyboard'
 import { configureIslandCamera, generateIslandGeometry, ISLAND_CENTER } from '../islandGeometry'
-import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordPhaserUpdate } from '../../devDiagnostics'
+import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordGameObjectMutation, recordPhaserUpdate } from '../../devDiagnostics'
 
 const updateTiming = new DevTiming('Phaser IslandScene update')
 const islandTiming = new DevTiming('island generation/render')
@@ -25,7 +25,7 @@ export class IslandScene extends Phaser.Scene {
     const coastline = generateIslandGeometry(island.generation_seed)
 
     this.cameras.main.setBackgroundColor(0x176b87)
-    this.drawIsland(coastline)
+    if (!debugSwitches.hideIsland && !debugSwitches.hideAllGameObjects) this.drawIsland(coastline)
 
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
     this.bridge.setIslandGeometry(coastline)
@@ -42,7 +42,11 @@ export class IslandScene extends Phaser.Scene {
       .setSize(Math.max(54, name.width + 12), 66)
       .setInteractive({ useHandCursor: true })
     this.player.on('pointerup', () => (this.registry.get('onPlayerClick') as () => void)())
-    configureIslandCamera(this.cameras.main, this.player)
+    if (debugSwitches.hidePlayer || debugSwitches.hideAllGameObjects) this.player.setVisible(false)
+    if (!debugSwitches.disableCameraFollow) configureIslandCamera(this.cameras.main, this.player)
+    if (debugSwitches.hideAllGameObjects) this.children.list.forEach((child) => {
+      if ('setVisible' in child) (child as Phaser.GameObjects.GameObject & { setVisible: (visible: boolean) => void }).setVisible(false)
+    })
     this.keys = new GameKeyboardState(this.input.keyboard!)
     const lifecycle = this.registry.get('sceneLifecycle') as SceneLifecycleCallbacks
     lifecycle.onReady(this)
@@ -89,7 +93,10 @@ export class IslandScene extends Phaser.Scene {
       this.lastTick = time
       const position = { x: this.player.x, y: this.player.y }
       void this.bridge.tick(this.keys.snapshot(), position).then((next) => {
-        if (next) this.player.setPosition(next.x, next.y)
+        if (next) {
+          recordGameObjectMutation('setPosition')
+          this.player.setPosition(next.x, next.y)
+        }
       })
     }
     if (devDiagnosticsEnabled) {

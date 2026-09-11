@@ -14,6 +14,13 @@ export const debugSwitches = {
   disablePython: query.get('disablePython') === 'true',
   disableDecorations: query.get('disableDecorations') === 'true',
   disableRendering: query.get('disableRendering') === 'true',
+  disablePhaserRenderer: query.get('disablePhaserRenderer') === 'true' || query.get('disableRendering') === 'true',
+  hideAllGameObjects: query.get('hideAllGameObjects') === 'true',
+  hideIsland: query.get('hideIsland') === 'true',
+  hidePlayer: query.get('hidePlayer') === 'true',
+  disableCameraFollow: query.get('disableCameraFollow') === 'true',
+  disableWebGLPostFX: query.get('disableWebGLPostFX') === 'true',
+  rendererRestartExperiment: query.get('rendererRestartExperiment') === 'true',
   disableScene: query.get('disableScene') === 'true',
   staticIsland: query.get('staticIsland') === 'true',
 } as const
@@ -45,6 +52,7 @@ export function installInputLatencyProbe(host: HTMLElement, mode: EditorDiagnost
     const started = keyStarted
     keyStarted = null
     inputSamples.push(performance.now() - started)
+    recordInputLatency(average(inputSamples))
     if (inputSamples.length > 500) inputSamples.shift()
     requestAnimationFrame(() => {
       paintSamples.push(performance.now() - started)
@@ -92,6 +100,20 @@ const phaserSamples: Record<PhaserDiagnosticSample, number[]> = {
   update: [], render: [], frame: [], rafGap: [],
 }
 
+let latestInputLatency = 0
+const mutationCounts: Record<string, number> = {
+  'Graphics.clear': 0, 'Graphics.fillPath': 0, 'Graphics.strokePath': 0,
+  setPosition: 0, setText: 0, setScale: 0,
+}
+
+export function recordInputLatency(duration: number): void {
+  latestInputLatency = duration
+}
+
+export function recordGameObjectMutation(name: keyof typeof mutationCounts): void {
+  if (devDiagnosticsEnabled) mutationCounts[name] += 1
+}
+
 function addPhaserSample(kind: PhaserDiagnosticSample, duration: number): void {
   const samples = phaserSamples[kind]
   samples.push(duration)
@@ -104,8 +126,10 @@ export function recordPhaserUpdate(duration: number): void {
 }
 
 /** Adds a dev-only, DOM-independent probe around Phaser's update and render phases. */
-export function installPhaserDiagnostics(game: import('phaser').Game, host: HTMLElement): () => void {
-  if (!devDiagnosticsEnabled) return () => undefined
+export type PhaserDiagnostics = { setEditorOpen: (open: boolean) => void; dispose: () => void }
+
+export function installPhaserDiagnostics(game: import('phaser').Game, host: HTMLElement): PhaserDiagnostics {
+  if (!devDiagnosticsEnabled) return { setEditorOpen: () => undefined, dispose: () => undefined }
   const output = document.createElement('output')
   output.className = 'phaser-diagnostics'
   output.setAttribute('aria-live', 'off')
@@ -116,6 +140,18 @@ export function installPhaserDiagnostics(game: import('phaser').Game, host: HTML
   let lastRaf = 0
   let rafId = 0
   let reportTimer = 0
+  let restartTimer = 0
+  let experimentStarted = false
+  const renderer = game.renderer as unknown as { render?: (...args: unknown[]) => void; drawCount?: number; type?: number }
+  const originalRender = renderer.render?.bind(renderer)
+  let rendererEnabled = !debugSwitches.disablePhaserRenderer
+  const setRendererEnabled = (enabled: boolean) => {
+    if (!originalRender) return
+    rendererEnabled = enabled
+    renderer.render = enabled ? originalRender : () => undefined
+  }
+  const rendererInitiallyDisabled = debugSwitches.disablePhaserRenderer
+  if (rendererInitiallyDisabled) setRendererEnabled(false)
   const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / Math.max(values.length, 1)
   const mark = (name: string) => performance.mark(name)
   const preStep = () => {
@@ -142,14 +178,37 @@ export function installPhaserDiagnostics(game: import('phaser').Game, host: HTML
     const gaps = phaserSamples.rafGap
     const fps = gaps.length ? 1000 / average(gaps) : 0
     const longFrames = phaserSamples.frame.filter((duration) => duration > 16).length
+    const canvas = game.canvas
+    const rect = canvas?.getBoundingClientRect()
+    const scene = game.scene.getScenes(true)[0]
+    const visibleCount = scene?.children.list.filter((child) => (child as { visible?: boolean }).visible !== false).length ?? 0
     output.textContent = [
+      `Renderer: ${rendererEnabled ? 'enabled' : 'disabled'}`,
+      `Objects: ${visibleCount}/${scene?.children.list.length ?? 0} visible`,
+      `Draw calls: ${renderer.drawCount ?? 'unavailable'}`,
       `Phaser update avg: ${average(phaserSamples.update).toFixed(2)} ms`,
       `Phaser render avg: ${average(phaserSamples.render).toFixed(2)} ms`,
       `FPS: ${fps.toFixed(1)}`,
       `Long frames (>16ms): ${longFrames}/${phaserSamples.frame.length}`,
       `Frame work avg: ${average(phaserSamples.frame).toFixed(2)} ms`,
       `rAF interval avg: ${average(gaps).toFixed(2)} ms`,
+      `Input latency: ${latestInputLatency.toFixed(2)} ms`,
+      `Canvas: ${canvas?.width ?? 0}×${canvas?.height ?? 0} px`,
+      `CSS: ${rect?.width.toFixed(0) ?? 0}×${rect?.height.toFixed(0) ?? 0} px · DPR ${window.devicePixelRatio.toFixed(2)}`,
+      `Alpha: ${game.config.transparent ? 'transparent' : 'opaque'} · renderer type ${renderer.type ?? 'headless'}`,
+      `Calls: ${Object.entries(mutationCounts).map(([name, count]) => `${name}=${count}`).join(' · ')}`,
     ].join('\n')
+  }
+
+  const setEditorOpen = (open: boolean) => {
+    if (!open || !debugSwitches.rendererRestartExperiment || experimentStarted || rendererInitiallyDisabled) return
+    experimentStarted = true
+    setRendererEnabled(false)
+    output.dataset.experiment = 'renderer stopped; restart in 3s'
+    restartTimer = window.setTimeout(() => {
+      setRendererEnabled(true)
+      output.dataset.experiment = 'renderer restarted'
+    }, 3000)
   }
 
   game.events.on('prestep', preStep)
@@ -159,13 +218,16 @@ export function installPhaserDiagnostics(game: import('phaser').Game, host: HTML
   rafId = requestAnimationFrame(rafProbe)
   reportTimer = window.setInterval(report, 500)
   report()
-  return () => {
+  const dispose = () => {
     game.events.off('prestep', preStep)
     game.events.off('poststep', postStep)
     game.events.off('prerender', preRender)
     game.events.off('postrender', postRender)
     cancelAnimationFrame(rafId)
     clearInterval(reportTimer)
+    clearTimeout(restartTimer)
+    if (!rendererInitiallyDisabled) setRendererEnabled(true)
     output.remove()
   }
+  return { setEditorOpen, dispose }
 }
