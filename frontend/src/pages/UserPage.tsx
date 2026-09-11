@@ -76,7 +76,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
           movementUnlocked={movementUnlocked}
           onJournalClick={openJournal}
         />}
-        {journalOpen && tutorial && <TutorialJournal initialState={tutorial} onClose={() => setJournalOpen(false)} onProgress={setTutorial} onFinished={finishTutorial} />}
+        {journalOpen && tutorial && <TutorialJournal initialState={tutorial} onClose={() => { setIsEditorFocused(false); setJournalOpen(false) }} onProgress={setTutorial} onFinished={finishTutorial} onEditorFocusChange={setIsEditorFocused} />}
       </div>
       {runtime ? <CodeArea
         runner={runtime.runner}
