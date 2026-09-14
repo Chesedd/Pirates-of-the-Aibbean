@@ -26,3 +26,16 @@ test('collision is resolved at the logical target and slides along obstacles', (
   assert.deepEqual(resolveCabinMovement(previous, { x: 610, y: 230 }, false), { x: 580, y: 230 })
   assert.deepEqual(resolveCabinMovement({ x: 470, y: 300 }, { x: 490, y: 300 }, false), { x: 490, y: 300 })
 })
+
+test('all first movement steps from the tutorial spawn are walkable after movement unlock', () => {
+  const spawn = { x: 470, y: 300 }
+  for (const target of [
+    { x: 470, y: 292 }, // W
+    { x: 470, y: 308 }, // S
+    { x: 462, y: 300 }, // A
+    { x: 478, y: 300 }, // D
+  ]) {
+    assert.equal(isCabinPositionWalkable(target.x, target.y, true), true)
+    assert.deepEqual(resolveCabinMovement(spawn, target, true), target)
+  }
+})

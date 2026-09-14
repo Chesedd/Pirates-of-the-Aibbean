@@ -19,6 +19,11 @@ export class GamePythonBridge {
     private readonly onOutput: (message: string) => void = () => undefined,
     private readonly onPosition: (position: GamePosition) => void = () => undefined) {}
 
+  /** Exposed for lifecycle diagnostics and regression tests; ticks require this to be true. */
+  get isActive(): boolean {
+    return this.active
+  }
+
   /** Uses the very same polygon that the scene renders; no collision shape is derived separately. */
   setIslandGeometry(coastline: Point[]): void {
     this.coastline = coastline

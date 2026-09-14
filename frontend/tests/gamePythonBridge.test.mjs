@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { GamePythonBridge, MAX_TICK_MOVE } from '../.test-dist/game/GamePythonBridge.js'
 import { generateIslandGeometry, ISLAND_CENTER } from '../.test-dist/game/islandGeometry.js'
+import { resolveCabinMovement } from '../.test-dist/game/cabinCollision.js'
 
 const keys = { up: false, down: false, left: false, right: false }
 const position = { x: 100, y: 100 }
@@ -61,6 +62,37 @@ test('movement starts working without reapplying player code after unlock', asyn
   assert.deepEqual(await bridge.tick(keys, position), position)
   bridge.setMovementUnlocked(true)
   assert.deepEqual(await bridge.tick(keys, position), { x: 110, y: 100 })
+})
+
+test('legacy reload activates saved player.py before the first cabin movement tick', async () => {
+  // Legacy persisted state: the old tutorial granted movement, but predates the
+  // physical ship-exit unlock. The saved program moves while W is held.
+  const movementUnlocked = true
+  const tutorialComplete = true
+  const tutorialShipExited = false
+  const savedPlayerCode = 'if key_pressed("w"):\n    y -= 8'
+  const runner = {
+    appliedCode: null,
+    async apply(code) { this.appliedCode = code },
+    async tick(pressed, current) {
+      return { ...current, y: current.y - (pressed.w && this.appliedCode === savedPlayerCode ? 8 : 0), stdout: '' }
+    },
+  }
+  const bridge = new GamePythonBridge(runner)
+  bridge.setMovementUnlocked(movementUnlocked)
+
+  assert.equal(tutorialComplete, true)
+  assert.equal(tutorialShipExited, false)
+  assert.equal(bridge.isActive, false)
+  assert.equal(await bridge.tick({ ...keys, w: true }, { x: 470, y: 300 }), null)
+
+  // This is the reload link owned by CodeArea: GET /game/code completes after
+  // the runtime is ready and the returned persisted source is applied.
+  assert.equal(await bridge.apply(savedPlayerCode), true)
+  assert.equal(bridge.isActive, true)
+  const pythonResult = await bridge.tick({ ...keys, w: true }, { x: 470, y: 300 })
+  assert.deepEqual(pythonResult, { x: 470, y: 292 })
+  assert.deepEqual(resolveCabinMovement({ x: 470, y: 300 }, pythonResult, movementUnlocked), { x: 470, y: 292 })
 })
 
 test('position persistence can be disabled while cabin simulation keeps moving', async () => {
