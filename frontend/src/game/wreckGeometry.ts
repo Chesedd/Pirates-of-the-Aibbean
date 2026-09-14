@@ -30,17 +30,15 @@ export function createWreckLayout(seed: number, anchor: Point): WreckLayout {
   const jitter = ((((seed >>> 0) * 2654435761) >>> 0) / 0xffffffff - .5) * .22
   const angle = inwardAngle - Math.PI / 2 + jitter
   const variant = (seed >>> 0) % 3
-  const hull = worldPoint(anchor, angle, 0, -85)
-  const crate = worldPoint(anchor, angle, -238, -7)
-  const barrel = worldPoint(anchor, angle, 231, 8)
+  const hull = worldPoint(anchor, angle, -12, 0)
+  const shoreCargo = worldPoint(anchor, angle, 294, 150)
   return {
-    anchor, angle, variant, length: 520, width: 190,
-    entrance: worldPoint(anchor, angle, 0, -18),
-    entranceApproach: worldPoint(anchor, angle, 0, 55),
+    anchor, angle, variant, length: 530, width: 220,
+    entrance: worldPoint(anchor, angle, 84, 100),
+    entranceApproach: worldPoint(anchor, angle, 84, 174),
     colliders: [
-      { kind: 'orientedRect', id: 'main-hull', x: hull.x, y: hull.y, halfWidth: 194, halfHeight: 61, angle },
-      { kind: 'orientedRect', id: 'large-crate', x: crate.x, y: crate.y, halfWidth: 27, halfHeight: 24, angle: angle + .08 },
-      { kind: 'circle', id: 'barrel', x: barrel.x, y: barrel.y, radius: 22 },
+      { kind: 'orientedRect', id: 'main-hull', x: hull.x, y: hull.y, halfWidth: 238, halfHeight: 78, angle },
+      { kind: 'orientedRect', id: 'shore-cargo', x: shoreCargo.x, y: shoreCargo.y, halfWidth: 38, halfHeight: 23, angle },
     ],
   }
 }

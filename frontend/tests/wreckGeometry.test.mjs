@@ -13,6 +13,7 @@ test('wreck layout is deterministic, large, and has a marked entrance', () => {
   assert.ok(first.width >= 150)
   assert.ok(Number.isFinite(first.entrance.x) && Number.isFinite(first.entrance.y))
   assert.equal(isWreckPositionWalkable(first.entranceApproach, first), true)
+  assert.ok(Math.hypot(first.entrance.x - first.entranceApproach.x, first.entrance.y - first.entranceApproach.y) > 50)
 })
 
 test('main hull is solid, while clear routes remain around both ends', () => {
@@ -22,12 +23,12 @@ test('main hull is solid, while clear routes remain around both ends', () => {
   assert.equal(isWreckPositionWalkable({ x: hull.x, y: hull.y }, layout), false)
 
   const endA = {
-    x: hull.x + Math.cos(layout.angle) * 235,
-    y: hull.y + Math.sin(layout.angle) * 235,
+    x: hull.x + Math.cos(layout.angle) * 280,
+    y: hull.y + Math.sin(layout.angle) * 280,
   }
   const endB = {
-    x: hull.x - Math.cos(layout.angle) * 235,
-    y: hull.y - Math.sin(layout.angle) * 235,
+    x: hull.x - Math.cos(layout.angle) * 280,
+    y: hull.y - Math.sin(layout.angle) * 280,
   }
   assert.equal(isWreckPositionWalkable(endA, layout), true)
   assert.equal(isWreckPositionWalkable(endB, layout), true)
