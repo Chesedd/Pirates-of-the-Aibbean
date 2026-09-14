@@ -8,17 +8,12 @@ import { GameKeyboardState } from '../gameKeyboard'
 import { SmoothPlayerPosition } from '../SmoothPlayerPosition'
 import { apiRequest } from '../../api/client'
 import type { Island } from '../../pages/UserPage'
+import { CABIN_WALKABLE, resolveCabinMovement } from '../cabinCollision'
 
 export const TUTORIAL_CABIN = { x: 50, y: 35, width: 800, height: 490 } as const
 export const TUTORIAL_PLAYER_SPAWN = { x: 470, y: 300 } as const
-export const CABIN_WALKABLE = { left: 90, right: 810, top: 78, bottom: 485, hatchLeft: 402, hatchRight: 538, exitY: 530 } as const
-
 export function cabinTarget(previous: { x: number; y: number }, target: { x: number; y: number }, unlocked: boolean) {
-  const horizontal = target.x >= CABIN_WALKABLE.left && target.x <= CABIN_WALKABLE.right
-  const hatch = target.x >= CABIN_WALKABLE.hatchLeft && target.x <= CABIN_WALKABLE.hatchRight
-  const vertical = target.y >= CABIN_WALKABLE.top && target.y <= CABIN_WALKABLE.bottom
-  const exitPassage = unlocked && hatch && target.y >= CABIN_WALKABLE.top && target.y <= CABIN_WALKABLE.exitY + 20
-  return horizontal && (vertical || exitPassage) ? target : previous
+  return resolveCabinMovement(previous, target, unlocked)
 }
 
 export class TutorialShipScene extends Phaser.Scene {

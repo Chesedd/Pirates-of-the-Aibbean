@@ -48,8 +48,7 @@ test('tutorial cabin contains a physical, server-authoritative exit', () => {
 
 test('cabin walls and locked hatch filter logical targets before interpolation', () => {
   assert.match(scene, /const accepted = cabinTarget\(position, next, this\.movementUnlocked\)/)
-  assert.match(scene, /horizontal && \(vertical \|\| exitPassage\) \? target : previous/)
-  assert.match(scene, /exitPassage = unlocked && hatch/)
+  assert.match(scene, /resolveCabinMovement\(previous, target, unlocked\)/)
   assert.match(scene, /setPositionPersistenceEnabled\(false\)/)
 })
 
