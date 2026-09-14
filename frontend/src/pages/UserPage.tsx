@@ -18,7 +18,8 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
   const [journalOpen, setJournalOpen] = useState(false)
   const [error, setError] = useState('')
   const [output, setOutput] = useState('')
-  const [isEditorOpen, setIsEditorOpen] = useState(debugSwitches.editorOnly)
+  // Diagnostic renderer/scene modes cannot rely on a Phaser object being clickable.
+  const [isEditorOpen, setIsEditorOpen] = useState(debugSwitches.editorOnly || debugSwitches.forceEditorOpen)
   const [isEditorFocused, setIsEditorFocused] = useState(false)
   const [runtime, setRuntime] = useState<PythonRuntime | null>(null)
   const [tutorial, setTutorial] = useState<TutorialState | null>(null)

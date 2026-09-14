@@ -66,6 +66,8 @@ Overlay также показывает состояние renderer, число 
 | `?disableRendering=true` | оставляет Phaser scene, объекты и update, но использует HEADLESS и полностью исключает Canvas/WebGL render |
 | `?disableScene=true` | не создаёт `Phaser.Game` вообще |
 
+Чтобы Monaco был открыт сразу и не зависел от клика по игровому персонажу, к любому из этих режимов добавляется `forceEditorOpen=true`. Например, `?forceEditorOpen=true&disablePhaserRenderer=true` сохраняет Scene/update с HEADLESS renderer, а `?forceEditorOpen=true&disableScene=true` вообще не создаёт `Phaser.Game`; в обоих случаях остаются обычный двухколоночный layout и полноценный редактор `player.py` (без режима `editorOnly`). Аналогично флаг можно сочетать с `hideAllGameObjects=true` и `disableWebGLPostFX=true`.
+
 Решающий критерий сформулирован заранее: утверждать «рендеринг Phaser является причиной» можно только если лаг воспроизводится в baseline и исчезает с `disableRendering=true`, при этом update остаётся активным. Если лаг остаётся в HEADLESS, но исчезает с `disableScene=true`, следующий минимальный probe должен измерить Phaser TimeStep/input plugins. Если не исчезает и с `disableScene=true`, причина вне Phaser, и это также будет прямым результатом, а не догадкой.
 
 ## Вывод текущего этапа
