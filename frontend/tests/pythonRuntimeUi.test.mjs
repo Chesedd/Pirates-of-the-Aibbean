@@ -11,6 +11,12 @@ test('Run and Apply require a ready Python runtime', () => {
   assert.equal((codeArea.match(/disabled=\{runtimeState !== 'ready' \|\| isRunning\}/g) ?? []).length, 2)
 })
 
+test('saved player.py is automatically applied once both code and runtime are ready', () => {
+  assert.match(codeArea, /if \(initialCode === null \|\| savedCodeAppliedForReadyRuntime\.current\) return/)
+  assert.match(codeArea, /savedCodeAppliedForReadyRuntime\.current = true\s+void bridge\.apply\(initialCode\)/)
+  assert.match(codeArea, /if \(runtimeState !== 'ready'\)/)
+})
+
 test('the Python status presents loading, ready, failure details, and Retry', () => {
   assert.match(codeArea, /Loading Python…/)
   assert.match(codeArea, /Python ready/)

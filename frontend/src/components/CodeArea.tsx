@@ -71,6 +71,7 @@ export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isO
   const renderCount = useRef(0)
   const changeCount = useRef(0)
   const lastKeyDown = useRef<number | null>(null)
+  const savedCodeAppliedForReadyRuntime = useRef(false)
   const changeTiming = useRef(new DevTiming('Monaco onChange')).current
   const keyTiming = useRef(new DevTiming('keydown -> Monaco callback complete')).current
   const [initialCode, setInitialCode] = useState<string | null>(null)
@@ -88,6 +89,23 @@ export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isO
       unsubscribe()
     }
   }, [runner])
+
+  useEffect(() => {
+    if (runtimeState !== 'ready') {
+      // A retried/restarted worker has lost its applied program. Allow the
+      // persisted program to be installed again when that worker is ready.
+      savedCodeAppliedForReadyRuntime.current = false
+      return
+    }
+    if (initialCode === null || savedCodeAppliedForReadyRuntime.current) return
+
+    // Loading player.py and showing it in Monaco is not enough: a fresh bridge
+    // starts inactive, so install the persisted program for game ticks too.
+    // The ref also prevents React StrictMode's repeated effects from racing two
+    // apply requests against the single-request Python worker.
+    savedCodeAppliedForReadyRuntime.current = true
+    void bridge.apply(initialCode)
+  }, [bridge, initialCode, runtimeState])
 
   useEffect(() => {
     apiRequest<CodeResponse>('/game/code')
