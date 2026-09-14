@@ -1,0 +1,246 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+<defs>
+<style>
+.label{font-family:Inter,Arial,sans-serif;fill:#f4ead2;font-size:22px;font-weight:700}
+.small{font-family:Inter,Arial,sans-serif;fill:#d9cfb7;font-size:16px}
+.tiny{font-family:ui-monospace,Consolas,monospace;fill:#d9cfb7;font-size:14px}
+.outline{stroke:#21150f;stroke-width:8;stroke-linejoin:round;stroke-linecap:round}
+.deckline{stroke:#9c6232;stroke-width:4;stroke-linecap:round}
+.guide{stroke:#f5c451;stroke-width:3;stroke-dasharray:10 10;fill:none}
+</style>
+</defs>
+
+<rect width="1600" height="1000" fill="#071a28"/>
+
+<rect x="40" y="40" width="1120" height="920" rx="24" fill="#0b2538" stroke="#315369" stroke-width="3"/>
+<text x="80" y="92" class="label">SHIPWRECK REFERENCE v10 — adjusted companionway</text>
+<text x="80" y="122" class="small">Строгий top-down. Корабль читается по конструкции, а не по набору декоративных элементов.</text>
+
+<!-- shore -->
+<rect x="80" y="160" width="1040" height="740" rx="32" fill="#e7c66b"/>
+<path d="M80,160 H1120 V314
+ C1038,302 968,323 900,354
+ C824,389 756,405 688,398
+ C610,390 550,356 486,326
+ C412,292 330,280 250,300
+ C170,320 120,355 80,386 Z" fill="#176b87"/>
+<path d="M80,373
+ C160,325 224,302 298,302
+ C410,300 478,340 548,372
+ C620,406 700,418 780,405
+ C860,392 930,350 1004,327
+ C1044,314 1080,310 1120,314"
+ fill="none" stroke="#d9e2c7" stroke-width="12" opacity=".75"/>
+<path d="M80,642 C210,600 330,620 420,650 C530,684 650,648 750,618 C850,590 970,594 1120,620 V900 H80Z"
+ fill="#4b9b58" opacity=".86"/>
+
+<!-- ship -->
+<g transform="translate(620 508) rotate(-6)">
+  <!-- outer hull: flat transom stern, long sides, pointed bow -->
+  <path d="M-350,-98
+           L-350,98
+           L-322,118
+           C-246,150 -130,152 -28,142
+           C78,132 186,126 262,94
+           C314,72 348,40 374,12
+           L386,0
+           L374,-12
+           C348,-40 314,-72 262,-94
+           C186,-126 78,-132 -28,-142
+           C-130,-152 -246,-150 -322,-118 Z"
+        fill="#392216" class="outline"/>
+
+  <!-- inner deck -->
+  <path d="M-314,-72
+           L-314,72
+           C-250,112 -142,118 -36,108
+           C72,98 170,92 238,68
+           C288,50 318,26 340,0
+           C318,-26 288,-50 238,-68
+           C170,-92 72,-98 -36,-108
+           C-142,-118 -250,-112 -314,-72 Z"
+        fill="#70401f" stroke="#9c6232" stroke-width="5"/>
+
+  <!-- raised stern quarterdeck -->
+  <path d="M-314,-70
+           L-314,70
+           C-278,92 -228,99 -174,94
+           L-150,62
+           L-150,-62
+           L-174,-94
+           C-228,-99 -278,-92 -314,-70 Z"
+        fill="#5a341d" stroke="#21150f" stroke-width="5"/>
+
+  <!-- quarterdeck planks -->
+  <g class="deckline" opacity=".72">
+    <line x1="-286" y1="-44" x2="-176" y2="-44"/>
+    <line x1="-290" y1="-8" x2="-170" y2="-8"/>
+    <line x1="-286" y1="28" x2="-176" y2="28"/>
+  </g>
+
+  <!-- companionway: moved fully off the quarterdeck and rotated so the stair run follows the ship axis -->
+  <g transform="translate(-78 0)">
+    <path d="M-48,-28 L48,-28 L48,28 L-48,28 Z"
+          fill="#4a2b18" stroke="#21150f" stroke-width="6"/>
+    <path d="M-34,-18 L36,-18 L36,18 L-34,18 Z" fill="#130c08"/>
+    <path d="M-48,-28 L-34,-18 L-34,18 L-48,28 Z" fill="#58351f"/>
+    <path d="M48,-28 L36,-18 L36,18 L48,28 Z" fill="#58351f"/>
+    <!-- stair treads now read fore-aft rather than across the ship -->
+    <line x1="-22" y1="-14" x2="-22" y2="14" stroke="#c08a4b" stroke-width="5"/>
+    <line x1="-8" y1="-14" x2="-8" y2="14" stroke="#b07b45" stroke-width="5"/>
+    <line x1="6" y1="-14" x2="6" y2="14" stroke="#9d6938" stroke-width="5"/>
+    <line x1="20" y1="-14" x2="20" y2="14" stroke="#80552f" stroke-width="5"/>
+    <line x1="-40" y1="-22" x2="40" y2="-22" stroke="#c08a4b" stroke-width="5"/>
+  </g>
+
+  <!-- mast stump: top-down wood, not an icon -->
+  <g transform="translate(8 -6)">
+    <circle r="27" fill="#58351f" stroke="#21150f" stroke-width="7"/>
+    <circle r="16" fill="#704629" stroke="#9c6232" stroke-width="4"/>
+    <path d="M-5,-11 C2,-6 3,1 -2,9 M8,-10 C4,-4 5,4 10,9"
+          fill="none" stroke="#392216" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- sparse plank direction lines -->
+  <g class="deckline" opacity=".68">
+    <line x1="-54" y1="-64" x2="-8" y2="-68"/>
+    <line x1="-52" y1="58" x2="-4" y2="54"/>
+    <line x1="66" y1="-54" x2="112" y2="-50"/>
+    <line x1="64" y1="54" x2="114" y2="50"/>
+    <line x1="202" y1="26" x2="248" y2="18"/>
+  </g>
+
+  <!-- starboard-side breach: cut directly out of hull/deck edge -->
+  <path d="M104,-104
+           L150,-110
+           L196,-98
+           L220,-78
+           L202,-62
+           L214,-42
+           L188,-24
+           L158,-34
+           L132,-58
+           L98,-68
+           L90,-88 Z"
+        fill="#100b09" stroke="#21150f" stroke-width="6"/>
+  <!-- only two structural broken beams at the edge -->
+  <path d="M102,-100 L84,-80" stroke="#58351f" stroke-width="8" stroke-linecap="round"/>
+  <path d="M204,-88 L224,-66" stroke="#58351f" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- bow inner reinforcement -->
+  <path d="M264,-62 C300,-46 326,-24 342,0 C326,24 300,46 264,62 L286,28 L298,0 L286,-28 Z"
+        fill="#58351f" stroke="#21150f" stroke-width="5"/>
+
+  <!-- small cargo cluster tucked near bow -->
+  <g transform="translate(236 48)">
+    <rect x="-46" y="-24" width="44" height="44" rx="5" fill="#74401f" stroke="#21150f" stroke-width="5"/>
+    <line x1="-40" y1="-18" x2="-8" y2="14" stroke="#2d1a12" stroke-width="4"/>
+    <line x1="-8" y1="-18" x2="-40" y2="14" stroke="#2d1a12" stroke-width="4"/>
+    <circle cx="23" cy="0" r="20" fill="#81502a" stroke="#21150f" stroke-width="5"/>
+    <circle cx="23" cy="0" r="10" fill="none" stroke="#c38a4a" stroke-width="3"/>
+  </g>
+
+  <!-- rail gap where the gangway attaches -->
+  <path d="M78,118 L142,110 L154,136 L88,146 Z"
+        fill="#100b09" stroke="#21150f" stroke-width="5"/>
+
+  <!-- gangway aligned with the side opening -->
+  <g transform="translate(117 136) rotate(-2)">
+    <path d="M-31,-8 L31,-8 L38,84 L-38,84 Z"
+          fill="#58351f" stroke="#21150f" stroke-width="6"/>
+    <line x1="-24" y1="8" x2="24" y2="8" stroke="#c08a4b" stroke-width="5"/>
+    <line x1="-26" y1="27" x2="26" y2="27" stroke="#c08a4b" stroke-width="5"/>
+    <line x1="-28" y1="46" x2="28" y2="46" stroke="#c08a4b" stroke-width="5"/>
+    <line x1="-31" y1="65" x2="31" y2="65" stroke="#c08a4b" stroke-width="5"/>
+  </g>
+</g>
+
+<!-- detached wreck elements: each is identifiable -->
+<!-- broken mast with cross-spar on shore -->
+<g transform="translate(930 346) rotate(8)">
+  <rect x="-10" y="-8" width="178" height="24" rx="10" fill="#58351f" stroke="#21150f" stroke-width="6"/>
+  <rect x="14" y="-3" width="128" height="10" rx="5" fill="#704629"/>
+  <line x1="66" y1="-31" x2="66" y2="47" stroke="#58351f" stroke-width="14" stroke-linecap="round"/>
+  <line x1="66" y1="-31" x2="66" y2="47" stroke="#704629" stroke-width="7" stroke-linecap="round"/>
+</g>
+
+<!-- detached hull-side panel -->
+<g transform="translate(260 690) rotate(-14)">
+  <path d="M0,0 L148,-10 L168,24 L18,42 Z" fill="#392216" stroke="#21150f" stroke-width="7"/>
+  <line x1="28" y1="7" x2="140" y2="0" class="deckline"/>
+  <line x1="34" y1="24" x2="148" y2="18" class="deckline"/>
+</g>
+
+<!-- pair of deck planks -->
+<g fill="#70401f" stroke="#21150f" stroke-width="6">
+  <rect x="408" y="742" width="108" height="20" rx="7" transform="rotate(7 462 752)"/>
+  <rect x="420" y="772" width="88" height="18" rx="7" transform="rotate(-3 464 781)"/>
+</g>
+
+<!-- washed cargo -->
+<g transform="translate(994 650)">
+  <rect x="-54" y="-28" width="54" height="54" rx="5" fill="#74401f" stroke="#21150f" stroke-width="6"/>
+  <circle cx="43" cy="7" r="25" fill="#81502a" stroke="#21150f" stroke-width="6"/>
+  <circle cx="43" cy="7" r="13" fill="none" stroke="#c38a4a" stroke-width="4"/>
+</g>
+
+<!-- player -->
+<g transform="translate(765 760)">
+  <ellipse cx="0" cy="18" rx="22" ry="12" fill="#0b0806" opacity=".4"/>
+  <circle cx="0" cy="0" r="18" fill="#315f78" stroke="#142c38" stroke-width="4"/>
+  <circle cx="0" cy="-10" r="12" fill="#f0d1a2" stroke="#6f3928" stroke-width="3"/>
+  <path d="M-19,-22 L0,-34 L19,-22 L0,-13 Z" fill="#bd392d" stroke="#6b201a" stroke-width="3"/>
+  <text x="34" y="7" class="small">персонаж = 1×</text>
+</g>
+
+<!-- external callouts only -->
+<path d="M492,666 C500,628 506,594 512,564" class="guide"/>
+<circle cx="514" cy="558" r="9" fill="#f5c451"/>
+<text x="154" y="683" class="small">спуск в каюту: развёрнут и вынесен вперёд от кормы</text>
+
+<path d="M785,694 C803,708 818,720 834,733" class="guide"/>
+<circle cx="838" cy="736" r="9" fill="#f5c451"/>
+<text x="854" y="742" class="small">трап из разрыва борта</text>
+
+<line x1="370" y1="845" x2="860" y2="845" class="guide"/>
+<line x1="370" y1="832" x2="370" y2="858" stroke="#f5c451" stroke-width="3"/>
+<line x1="860" y1="832" x2="860" y2="858" stroke="#f5c451" stroke-width="3"/>
+<text x="520" y="880" class="small">корпус ≈ 9× длины персонажа</text>
+
+<!-- technical panel -->
+<rect x="1190" y="40" width="370" height="920" rx="24" fill="#0b2538" stroke="#315369" stroke-width="3"/>
+<text x="1225" y="92" class="label">v10 — правка спуска в каюту</text>
+
+<text x="1225" y="145" class="small">Палубная логика</text>
+<text x="1225" y="174" class="tiny">КОРМА</text>
+<text x="1225" y="198" class="tiny">→ приподнятая кормовая часть</text>
+<text x="1225" y="222" class="tiny">→ спуск в каюту вынесен с кормы</text>
+<text x="1225" y="246" class="tiny">→ основание сломанной мачты</text>
+<text x="1225" y="270" class="tiny">→ свободная рабочая палуба</text>
+<text x="1225" y="294" class="tiny">→ повреждение правого борта</text>
+<text x="1225" y="318" class="tiny">→ НОС</text>
+
+<text x="1225" y="370" class="small">Почему это читается</text>
+<text x="1225" y="398" class="tiny">• корма отличается от носа</text>
+<text x="1225" y="422" class="tiny">• спуск не заходит на кормовую часть</text>
+<text x="1225" y="446" class="tiny">• ступени развёрнуты по логике палубы</text>
+<text x="1225" y="470" class="tiny">• пробоина действительно вырывает борт</text>
+<text x="1225" y="494" class="tiny">• трап продолжает отверстие в борту</text>
+<text x="1225" y="518" class="tiny">• декор не закрывает маршруты</text>
+
+<text x="1225" y="570" class="small">На палубе оставлены только</text>
+<text x="1225" y="598" class="tiny">1. кормовая конструкция</text>
+<text x="1225" y="622" class="tiny">2. companionway</text>
+<text x="1225" y="646" class="tiny">3. основание мачты</text>
+<text x="1225" y="670" class="tiny">4. одна пробоина</text>
+<text x="1225" y="694" class="tiny">5. одна грузовая группа</text>
+<text x="1225" y="718" class="tiny">6. трап</text>
+
+<text x="1225" y="770" class="small">Для Codex</text>
+<text x="1225" y="798" class="tiny">Повторять геометрию и расположение.</text>
+<text x="1225" y="822" class="tiny">Не добавлять случайный мусор на палубу.</text>
+<text x="1225" y="846" class="tiny">Не превращать stump/лестницы в иконки.</text>
+<text x="1225" y="870" class="tiny">Сохранять проходы свободными.</text>
+
+<text x="1225" y="930" class="tiny">SVG — технический референс для Phaser.Graphics.</text>
+</svg>
