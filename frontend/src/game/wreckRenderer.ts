@@ -1,8 +1,6 @@
 import Phaser from 'phaser'
-import type { WreckLayout } from './wreckGeometry'
+import { WRECK_REFERENCE_SCALE, type WreckLayout } from './wreckGeometry'
 import type { WreckDebris, WreckDebrisLayout } from './wreckDebris'
-
-const REFERENCE_SCALE = 0.72
 
 function addCrate(g: Phaser.GameObjects.Graphics, x: number, y: number, size: number) {
   g.fillStyle(0x74401f).fillRoundedRect(x, y, size, size, 5)
@@ -23,7 +21,7 @@ export function drawWreck(scene: Phaser.Scene, layout: WreckLayout, debris?: Wre
   const g = scene.add.graphics()
     .setPosition(layout.anchor.x, layout.anchor.y)
     .setRotation(layout.angle)
-    .setScale(REFERENCE_SCALE)
+    .setScale(WRECK_REFERENCE_SCALE)
     .setData('role', 'island-wreck')
     .setData('wreck-variant', layout.variant)
 

@@ -16,8 +16,13 @@ export type WreckLayout = {
 }
 
 const PLAYER_RADIUS = 18
+/** Scale used by both the v10 artwork and its collision model. */
+export const WRECK_REFERENCE_SCALE = 0.72
 
-function worldPoint(anchor: Point, angle: number, localX: number, localY: number): Point {
+/** Converts coordinates from the renderer's unscaled local space to world space. */
+export function wreckLocalToWorld(anchor: Point, angle: number, localX: number, localY: number): Point {
+  localX *= WRECK_REFERENCE_SCALE
+  localY *= WRECK_REFERENCE_SCALE
   return {
     x: anchor.x + localX * Math.cos(angle) - localY * Math.sin(angle),
     y: anchor.y + localX * Math.sin(angle) + localY * Math.cos(angle),
@@ -30,15 +35,40 @@ export function createWreckLayout(seed: number, anchor: Point): WreckLayout {
   const jitter = ((((seed >>> 0) * 2654435761) >>> 0) / 0xffffffff - .5) * .22
   const angle = inwardAngle - Math.PI / 2 + jitter
   const variant = (seed >>> 0) % 3
-  const hull = worldPoint(anchor, angle, -12, 0)
-  const shoreCargo = worldPoint(anchor, angle, 294, 150)
+  const point = (x: number, y: number) => wreckLocalToWorld(anchor, angle, x, y)
+  const rect = (id: string, x: number, y: number, halfWidth: number, halfHeight: number, rotation = 0): WreckCollider => ({
+    kind: 'orientedRect', id, ...point(x, y),
+    halfWidth: halfWidth * WRECK_REFERENCE_SCALE,
+    halfHeight: halfHeight * WRECK_REFERENCE_SCALE,
+    angle: angle + rotation,
+  })
+  const circle = (id: string, x: number, y: number, radius: number): WreckCollider => ({
+    kind: 'circle', id, ...point(x, y), radius: radius * WRECK_REFERENCE_SCALE,
+  })
   return {
     anchor, angle, variant, length: 530, width: 220,
-    entrance: worldPoint(anchor, angle, 84, 100),
-    entranceApproach: worldPoint(anchor, angle, 84, 174),
+    entrance: point(117, 139),
+    entranceApproach: point(117, 242),
     colliders: [
-      { kind: 'orientedRect', id: 'main-hull', x: hull.x, y: hull.y, halfWidth: 238, halfHeight: 78, angle },
-      { kind: 'orientedRect', id: 'shore-cargo', x: shoreCargo.x, y: shoreCargo.y, halfWidth: 38, halfHeight: 23, angle },
+      // Thin rails follow the visible hull perimeter. The starboard rail is split
+      // around the gangway, rather than turning the whole deck into an obstacle.
+      rect('port-side-stern', -205, -125, 105, 8),
+      rect('port-side-mid', -45, -120, 57, 8),
+      rect('port-side-forward', 82, -111, 58, 8),
+      rect('port-side-bow', 205, -91, 54, 8, .17),
+      rect('starboard-side-stern', -205, 125, 105, 8),
+      rect('starboard-side-mid', -47, 118, 58, 8),
+      rect('starboard-side-forward', 211, 88, 55, 8, -.2),
+      rect('stern', -324, 0, 9, 86),
+      rect('bow-port', 304, -49, 55, 8, .58),
+      rect('bow-starboard', 304, 49, 55, 8, -.58),
+
+      // Only physical deck features are solid; raised deck planking remains walkable.
+      circle('mast-stump', 8, -6, 27),
+      rect('companionway-hole', -77, 0, 35, 18),
+      rect('deck-cargo', 231, 40, 47, 25),
+      circle('breach', 158, -70, 28),
+      rect('shore-cargo', 408, 208, 53, 32),
     ],
   }
 }
