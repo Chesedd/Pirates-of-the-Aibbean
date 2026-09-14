@@ -8,6 +8,7 @@ import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordGameOb
 import { SmoothPlayerPosition } from '../SmoothPlayerPosition'
 import { createWreckLayout, resolveWreckMovement, type WreckLayout } from '../wreckGeometry'
 import { drawWreck } from '../wreckRenderer'
+import { generateWreckDebris } from '../wreckDebris'
 
 const updateTiming = new DevTiming('Phaser IslandScene update')
 const islandTiming = new DevTiming('island generation/render')
@@ -32,7 +33,9 @@ export class IslandScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor(0x176b87)
     if (!debugSwitches.hideIsland && !debugSwitches.hideAllGameObjects) this.drawIsland(coastline)
-    if (!debugSwitches.hideIsland && !debugSwitches.hideAllGameObjects) drawWreck(this, this.wreckLayout)
+    if (!debugSwitches.hideIsland && !debugSwitches.hideAllGameObjects) {
+      drawWreck(this, this.wreckLayout, generateWreckDebris(island.generation_seed, this.wreckLayout, coastline, island.player))
+    }
 
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
     this.bridge.setIslandGeometry(coastline)

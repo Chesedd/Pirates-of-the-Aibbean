@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import type { WreckLayout } from './wreckGeometry'
+import type { WreckDebris, WreckDebrisLayout } from './wreckDebris'
 
 const REFERENCE_SCALE = 0.72
 
@@ -18,7 +19,7 @@ function addBarrel(g: Phaser.GameObjects.Graphics, x: number, y: number, radius:
 }
 
 /** Draws the v10 technical reference as one deterministic, top-down Graphics landmark. */
-export function drawWreck(scene: Phaser.Scene, layout: WreckLayout) {
+export function drawWreck(scene: Phaser.Scene, layout: WreckLayout, debris?: WreckDebrisLayout) {
   const g = scene.add.graphics()
     .setPosition(layout.anchor.x, layout.anchor.y)
     .setRotation(layout.angle)
@@ -139,21 +140,54 @@ export function drawWreck(scene: Phaser.Scene, layout: WreckLayout) {
   g.lineStyle(5, 0xc08a4b)
   for (const y of [144, 163, 182, 201]) g.lineBetween(91, y, 143, y)
 
-  // Four restrained, identifiable debris groups around the hull.
-  g.lineStyle(14, 0x58351f).lineBetween(300, -190, 470, -166)
-  g.lineStyle(7, 0x704629).lineBetween(300, -190, 470, -166)
-  g.lineStyle(14, 0x58351f).lineBetween(365, -220, 354, -142)
-  g.fillStyle(0x392216).fillPoints([
-    { x: -420, y: 178 }, { x: -272, y: 168 }, { x: -252, y: 202 }, { x: -402, y: 220 },
-  ], true)
-  g.lineStyle(7, 0x21150f).strokePoints([
-    { x: -420, y: 178 }, { x: -272, y: 168 }, { x: -252, y: 202 }, { x: -402, y: 220 },
-  ], true)
-  g.lineStyle(4, 0x9c6232).lineBetween(-390, 187, -280, 179).lineBetween(-384, 204, -270, 192)
-  g.lineStyle(18, 0x21150f).lineBetween(-220, 235, -112, 246).lineBetween(-205, 270, -117, 265)
-  g.lineStyle(10, 0x70401f).lineBetween(-220, 235, -112, 246).lineBetween(-205, 270, -117, 265)
-  addCrate(g, 360, 174, 54)
-  addBarrel(g, 457, 208, 25)
-
+  if (debris) drawWreckDebris(scene, debris)
   return g
+}
+
+function drawDebrisItem(g: Phaser.GameObjects.Graphics, item: WreckDebris) {
+  if (item.kind === 'crate') {
+    addCrate(g, -22, -22, 44)
+  } else if (item.kind === 'barrel') {
+    // An ellipse reads as a barrel lying among cargo, with a simple central hoop.
+    g.fillStyle(0x81502a).fillEllipse(0, 0, 48, 36)
+    g.lineStyle(5, 0x21150f).strokeEllipse(0, 0, 48, 36)
+    g.lineStyle(3, 0xc38a4a).lineBetween(0, -17, 0, 17)
+  } else if (item.kind === 'plank-group') {
+    for (let index = 0; index < item.count; index += 1) {
+      const offset = (index - (item.count - 1) / 2) * 15
+      g.fillStyle(index % 2 ? 0x704629 : 0x58351f).fillRoundedRect(-48 + index * 5, offset - 5, 96, 10, 3)
+      g.lineStyle(3, 0x21150f).strokeRoundedRect(-48 + index * 5, offset - 5, 96, 10, 3)
+    }
+  } else if (item.kind === 'spar') {
+    g.lineStyle(18, 0x21150f).lineBetween(-68, 0, 68, 0)
+    g.lineStyle(11, 0x704629).lineBetween(-68, 0, 68, 0)
+    g.lineStyle(8, 0x21150f).lineBetween(22, -35, 22, 35)
+    g.lineStyle(5, 0x58351f).lineBetween(22, -35, 22, 35)
+  } else if (item.kind === 'deck-section') {
+    g.fillStyle(0x5a341d).fillPoints([
+      { x: -62, y: -30 }, { x: 57, y: -24 }, { x: 67, y: 25 }, { x: -54, y: 31 },
+    ], true)
+    g.lineStyle(6, 0x21150f).strokePoints([
+      { x: -62, y: -30 }, { x: 57, y: -24 }, { x: 67, y: 25 }, { x: -54, y: 31 },
+    ], true)
+    for (const y of [-14, 3, 19]) g.lineStyle(3, 0x9c6232).lineBetween(-48, y, 51, y - 2)
+  } else {
+    g.fillStyle(0x392216).fillPoints([
+      { x: -72, y: -25 }, { x: 65, y: -18 }, { x: 53, y: 28 }, { x: -61, y: 34 },
+    ], true)
+    g.lineStyle(7, 0x21150f).strokePoints([
+      { x: -72, y: -25 }, { x: 65, y: -18 }, { x: 53, y: 28 }, { x: -61, y: 34 },
+    ], true)
+    g.lineStyle(4, 0x9c6232).lineBetween(-48, -10, 47, -5).lineBetween(-43, 10, 42, 14)
+  }
+}
+
+/** Rendering is deliberately stateless: all variation is supplied by the generated data. */
+export function drawWreckDebris(scene: Phaser.Scene, debris: WreckDebrisLayout) {
+  return debris.items.map((item) => {
+    const graphics = scene.add.graphics().setPosition(item.x, item.y).setRotation(item.rotation).setScale(item.scale)
+      .setData('role', 'wreck-debris').setData('debris-kind', item.kind).setData('debris-seed', debris.seed)
+    drawDebrisItem(graphics, item)
+    return graphics
+  })
 }
