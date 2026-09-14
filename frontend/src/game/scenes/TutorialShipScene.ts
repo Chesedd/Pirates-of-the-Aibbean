@@ -5,9 +5,21 @@ import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordGameOb
 
 const updateTiming = new DevTiming('Phaser TutorialShipScene update')
 import { GameKeyboardState } from '../gameKeyboard'
+import { SmoothPlayerPosition } from '../SmoothPlayerPosition'
+import { apiRequest } from '../../api/client'
+import type { Island } from '../../pages/UserPage'
 
 export const TUTORIAL_CABIN = { x: 50, y: 35, width: 800, height: 490 } as const
 export const TUTORIAL_PLAYER_SPAWN = { x: 470, y: 300 } as const
+export const CABIN_WALKABLE = { left: 90, right: 810, top: 78, bottom: 485, hatchLeft: 402, hatchRight: 538, exitY: 530 } as const
+
+export function cabinTarget(previous: { x: number; y: number }, target: { x: number; y: number }, unlocked: boolean) {
+  const horizontal = target.x >= CABIN_WALKABLE.left && target.x <= CABIN_WALKABLE.right
+  const hatch = target.x >= CABIN_WALKABLE.hatchLeft && target.x <= CABIN_WALKABLE.hatchRight
+  const vertical = target.y >= CABIN_WALKABLE.top && target.y <= CABIN_WALKABLE.bottom
+  const exitPassage = unlocked && hatch && target.y >= CABIN_WALKABLE.top && target.y <= CABIN_WALKABLE.exitY + 20
+  return horizontal && (vertical || exitPassage) ? target : previous
+}
 
 export class TutorialShipScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Container
@@ -15,6 +27,10 @@ export class TutorialShipScene extends Phaser.Scene {
   private bridge!: GamePythonBridge
   private lastTick = 0
   private updateCount = 0
+  private smooth!: SmoothPlayerPosition
+  private movementUnlocked = false
+  private exiting = false
+  private hatch?: Phaser.GameObjects.Rectangle
 
   constructor() { super('tutorial-ship') }
 
@@ -37,7 +53,8 @@ export class TutorialShipScene extends Phaser.Scene {
     }
 
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
-    this.bridge.setMovementUnlocked(false)
+    this.bridge.setPositionPersistenceEnabled(false)
+    this.setMovementUnlocked(Boolean(this.registry.get('movementUnlocked')))
     this.keys = new GameKeyboardState(this.input.keyboard!)
     const lifecycle = this.registry.get('sceneLifecycle') as SceneLifecycleCallbacks
     lifecycle.onReady(this)
@@ -109,8 +126,8 @@ export class TutorialShipScene extends Phaser.Scene {
     g.fillStyle(0xe6a640).fillCircle(548, 111, 13)
     g.lineStyle(4, 0x392619).strokeCircle(548, 111, 19).lineBetween(536, 91, 560, 91)
 
-    // The future exit is a closed hatch set into the lower wall; it has no handler yet.
-    this.add.rectangle(470, 506, 136, 38, 0x54321f).setStrokeStyle(5, 0xc08a4b)
+    // The hatch opens after movement training; crossing it (not clicking it) exits.
+    this.hatch = this.add.rectangle(470, 506, 136, 38, 0x54321f).setStrokeStyle(5, 0xc08a4b)
       .setData('role', 'tutorial-exit').setData('transitionImplemented', false)
     this.add.circle(514, 506, 5, 0xe2b85f)
 
@@ -146,6 +163,7 @@ export class TutorialShipScene extends Phaser.Scene {
       [shadow, body, head, hat, facing, name]).setSize(70, 66).setData('role', 'tutorial-player')
       .setInteractive({ useHandCursor: true })
     this.player.on('pointerup', () => (this.registry.get('onPlayerClick') as () => void)())
+    this.smooth = new SmoothPlayerPosition(this.player, TUTORIAL_PLAYER_SPAWN)
   }
 
   private createStoryText() {
@@ -170,17 +188,43 @@ export class TutorialShipScene extends Phaser.Scene {
     if (!enabled) this.input.keyboard.resetKeys()
   }
 
+  setMovementUnlocked(unlocked: boolean) {
+    this.movementUnlocked = unlocked
+    this.bridge?.setMovementUnlocked(unlocked)
+    if (this.hatch) {
+      this.hatch.setFillStyle(unlocked ? 0x120d0a : 0x54321f)
+        .setStrokeStyle(5, unlocked ? 0xd5a35d : 0xc08a4b)
+        .setData('transitionImplemented', unlocked)
+    }
+  }
+
+  private exitShip() {
+    if (this.exiting) return
+    this.exiting = true
+    void apiRequest<Island>('/game/tutorial/exit-ship', { method: 'POST' }).then((island) => {
+      this.registry.set('island', island)
+      ;(this.registry.get('onShipExited') as (value: Island) => void)(island)
+      this.scene.start('island')
+    }).catch(() => { this.exiting = false })
+  }
+
   update(time: number) {
     const started = devDiagnosticsEnabled ? performance.now() : 0
     if (debugSwitches.disableGameLoop) return
+    this.smooth.update(time)
     if (devDiagnosticsEnabled && (++this.updateCount === 1 || this.updateCount % 100 === 0)) devCount('Phaser TutorialShipScene game tick', this.updateCount)
     if (time - this.lastTick >= 50) {
       this.lastTick = time
-      const position = { x: this.player.x, y: this.player.y }
+      const position = { ...this.smooth.logical }
       void this.bridge.tick(this.keys.snapshot(), position).then((next) => {
         if (next) {
+          const accepted = cabinTarget(position, next, this.movementUnlocked)
+          if (this.movementUnlocked && accepted.x >= CABIN_WALKABLE.hatchLeft && accepted.x <= CABIN_WALKABLE.hatchRight && accepted.y > CABIN_WALKABLE.exitY) {
+            this.exitShip()
+            return
+          }
           recordGameObjectMutation('setPosition')
-          this.player.setPosition(next.x, next.y)
+          this.smooth.setLogicalTarget(accepted, this.time.now)
         }
       })
     }

@@ -70,3 +70,21 @@ def point_is_inside_island(point: tuple[float, float], coastline: list[tuple[flo
 
 def position_is_on_island(seed: int, x: float, y: float) -> bool:
     return point_is_inside_island((x, y), generate_island_geometry(seed))
+
+
+def wreck_and_spawn(seed: int) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Return deterministic, inland wreck and adjacent player spawn points."""
+    coastline = generate_island_geometry(seed)
+    shore_x, shore_y = coastline[_u32(seed) % len(coastline)]
+    length = math.hypot(ISLAND_CENTER - shore_x, ISLAND_CENTER - shore_y)
+    unit_x = (ISLAND_CENTER - shore_x) / length
+    unit_y = (ISLAND_CENTER - shore_y) / length
+
+    def inland(distance: float) -> tuple[float, float]:
+        point = (shore_x + unit_x * distance, shore_y + unit_y * distance)
+        while not point_is_inside_island(point, coastline):
+            distance += 40
+            point = (shore_x + unit_x * distance, shore_y + unit_y * distance)
+        return point
+
+    return inland(180), inland(310)

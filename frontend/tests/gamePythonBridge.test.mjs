@@ -63,6 +63,19 @@ test('movement starts working without reapplying player code after unlock', asyn
   assert.deepEqual(await bridge.tick(keys, position), { x: 110, y: 100 })
 })
 
+test('position persistence can be disabled while cabin simulation keeps moving', async () => {
+  const saved = []
+  const bridge = new GamePythonBridge(
+    { apply: async () => {}, tick: async (_, current) => ({ x: current.x + 5, y: current.y, stdout: '' }) },
+    () => {},
+    (next) => saved.push(next),
+  )
+  bridge.setPositionPersistenceEnabled(false)
+  await bridge.apply('x += 5')
+  assert.deepEqual(await bridge.tick(keys, position), { x: 105, y: 100 })
+  assert.deepEqual(saved, [])
+})
+
 test('concurrent ticks are dropped instead of queued', async () => {
   let finish
   let calls = 0

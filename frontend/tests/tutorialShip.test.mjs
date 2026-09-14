@@ -6,9 +6,9 @@ const scene = readFileSync(new URL('../src/game/scenes/TutorialShipScene.ts', im
 const page = readFileSync(new URL('../src/pages/UserPage.tsx', import.meta.url), 'utf8')
 const journal = readFileSync(new URL('../src/components/TutorialJournal.tsx', import.meta.url), 'utf8')
 
-test('locked users receive the tutorial ship scene', () => {
+test('ship exit, rather than movement, selects the initial scene', () => {
   const createGame = readFileSync(new URL('../src/game/createGame.ts', import.meta.url), 'utf8')
-  assert.match(createGame, /movementUnlocked \? IslandScene : TutorialShipScene/)
+  assert.match(createGame, /shipExited \? \[IslandScene, TutorialShipScene\] : \[TutorialShipScene, IslandScene\]/)
   assert.match(page, /progress\?\.unlocks\.includes\('movement'\)/)
 })
 
@@ -35,13 +35,28 @@ test('tutorial player starts inside the cabin while movement remains locked', ()
   const [, spawnX, spawnY] = spawnMatch.map(Number)
   assert.ok(spawnX > cabinX && spawnX < cabinX + cabinWidth)
   assert.ok(spawnY > cabinY && spawnY < cabinY + cabinHeight)
-  assert.match(scene, /setMovementUnlocked\(false\)/)
+  assert.match(scene, /registry\.get\('movementUnlocked'\)/)
 })
 
-test('tutorial cabin contains a future exit without a transition handler', () => {
+test('tutorial cabin contains a physical, server-authoritative exit', () => {
   assert.match(scene, /setData\('role', 'tutorial-exit'\)/)
   assert.match(scene, /setData\('transitionImplemented', false\)/)
   assert.doesNotMatch(scene, /exit\.on\('pointerup'/)
+  assert.match(scene, /accepted\.y > CABIN_WALKABLE\.exitY/)
+  assert.match(scene, /\/game\/tutorial\/exit-ship/)
+})
+
+test('cabin walls and locked hatch filter logical targets before interpolation', () => {
+  assert.match(scene, /const accepted = cabinTarget\(position, next, this\.movementUnlocked\)/)
+  assert.match(scene, /horizontal && \(vertical \|\| exitPassage\) \? target : previous/)
+  assert.match(scene, /exitPassage = unlocked && hatch/)
+  assert.match(scene, /setPositionPersistenceEnabled\(false\)/)
+})
+
+test('movement unlock updates the existing scene without rebuilding Phaser', () => {
+  const canvas = readFileSync(new URL('../src/game/GameCanvas.tsx', import.meta.url), 'utf8')
+  assert.match(canvas, /tutorial\?\.setMovementUnlocked\?\.\(movementUnlocked\)/)
+  assert.doesNotMatch(canvas, /\[island, bridge, username, onPlayerClick, movementUnlocked/)
 })
 
 

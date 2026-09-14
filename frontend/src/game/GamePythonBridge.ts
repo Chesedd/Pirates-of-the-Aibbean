@@ -11,6 +11,7 @@ export class GamePythonBridge {
   private disposed = false
   private coastline: Point[] | null = null
   private movementUnlocked = true
+  private positionPersistenceEnabled = true
   private tickCount = 0
   private readonly tickTiming = new DevTiming('Python game tick')
   private readonly collisionTiming = new DevTiming('collision check')
@@ -26,6 +27,10 @@ export class GamePythonBridge {
   setMovementUnlocked(unlocked: boolean): void {
     this.movementUnlocked = unlocked
     if (!unlocked) this.coastline = null
+  }
+
+  setPositionPersistenceEnabled(enabled: boolean): void {
+    this.positionPersistenceEnabled = enabled
   }
 
   async apply(code: string) {
@@ -63,7 +68,7 @@ export class GamePythonBridge {
       const outsideIsland = this.coastline ? !pointIsInsideIsland(next, this.coastline) : false
       if (devDiagnosticsEnabled) this.collisionTiming.add(performance.now() - collisionStarted)
       if (outsideIsland) return position
-      this.onPosition(next)
+      if (this.positionPersistenceEnabled) this.onPosition(next)
       return next
     } catch (reason) {
       this.active = false

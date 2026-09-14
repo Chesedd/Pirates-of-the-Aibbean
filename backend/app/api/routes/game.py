@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import current_user
 from app.database.session import get_db
-from app.game.island_geometry import SAFE_SPAWN, position_is_on_island
+from app.game.island_geometry import SAFE_SPAWN, position_is_on_island, wreck_and_spawn
 from app.models.user import Island, PlayerCode, User, UserProgress, UserUnlock
 from app.schemas.code import PlayerCodePayload, PlayerCodePublic
 from app.schemas.island import IslandPublic, PlayerPositionUpdate
@@ -75,6 +75,26 @@ def get_progress(
     if progress is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Progress not found")
     return ProgressPublic(unlocks=sorted(unlock.key for unlock in progress.unlocks))
+
+
+@router.post("/tutorial/exit-ship", response_model=IslandPublic)
+def exit_tutorial_ship(
+    user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> IslandPublic:
+    progress = db.scalar(select(UserProgress).where(UserProgress.user_id == user.id))
+    island = db.scalar(select(Island).where(Island.user_id == user.id))
+    if progress is None or island is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Game state not found")
+    keys = {unlock.key for unlock in progress.unlocks}
+    if "movement" not in keys or not set(TUTORIAL_KEYS).issubset(keys):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Finish the tutorial before leaving the ship")
+    if "tutorial_ship_exited" not in keys:
+        _, spawn = wreck_and_spawn(island.generation_seed)
+        island.player_x, island.player_y = round(spawn[0]), round(spawn[1])
+        db.add(UserUnlock(progress_id=progress.id, key="tutorial_ship_exited"))
+        db.commit()
+        db.refresh(island)
+    return IslandPublic.from_island(island)
 
 
 @router.get("/island", response_model=IslandPublic)

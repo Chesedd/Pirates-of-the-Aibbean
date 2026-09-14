@@ -52,10 +52,12 @@ def test_users_receive_only_their_own_distinct_islands(client: TestClient, users
 
     client.post("/auth/logout")
     login(client, "firstmate", "temporary-password")
-    assert client.get("/game/island").json() == {
+    payload = client.get("/game/island").json()
+    assert payload | {"wreck": payload["wreck"]} == {
         "id": first_island.id,
         "generation_seed": first_island.generation_seed,
         "player": {"x": 2600, "y": 2600},
+        "wreck": payload["wreck"],
     }
     # The API exposes no island id or user id selector; query parameters cannot change ownership.
     assert client.get(f"/game/island?user_id={second['id']}&island_id={second_island.id}").json()["id"] == first_island.id
