@@ -6,9 +6,13 @@ import { GameKeyboardState } from '../gameKeyboard'
 import { configureIslandCamera, generateIslandGeometry, ISLAND_CENTER } from '../islandGeometry'
 import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordGameObjectMutation, recordPhaserUpdate } from '../../devDiagnostics'
 import { SmoothPlayerPosition } from '../SmoothPlayerPosition'
-import { createWreckLayout, resolveWreckMovement, type WreckLayout } from '../wreckGeometry'
+import {
+  createWreckLayout, findBlockingWreckCollider, isWreckPositionWalkable,
+  recoverWreckPosition, resolveWreckMovement, type WreckLayout,
+} from '../wreckGeometry'
 import { drawWreck } from '../wreckRenderer'
 import { generateWreckDebris } from '../wreckDebris'
+import { apiRequest } from '../../api/client'
 
 const updateTiming = new DevTiming('Phaser IslandScene update')
 const islandTiming = new DevTiming('island generation/render')
@@ -30,6 +34,20 @@ export class IslandScene extends Phaser.Scene {
     const island = this.registry.get('island') as Island
     const coastline = generateIslandGeometry(island.generation_seed)
     this.wreckLayout = createWreckLayout(island.generation_seed, island.wreck)
+    const initialPosition = { ...island.player }
+    const blockingCollider = findBlockingWreckCollider(initialPosition, this.wreckLayout)
+    const initialWalkable = isWreckPositionWalkable(initialPosition, this.wreckLayout)
+    const recoveredPosition = recoverWreckPosition(initialPosition, this.wreckLayout, coastline)
+    if (devDiagnosticsEnabled) console.info('Wreck initial position', {
+      playerPosition: initialPosition,
+      wreckAnchor: this.wreckLayout.anchor,
+      playerWalkable: initialWalkable,
+      blockingCollider,
+    })
+    if (recoveredPosition.x !== initialPosition.x || recoveredPosition.y !== initialPosition.y) {
+      island.player = recoveredPosition
+      void apiRequest('/game/position', { method: 'PUT', body: JSON.stringify(recoveredPosition) })
+    }
 
     this.cameras.main.setBackgroundColor(0x176b87)
     if (!debugSwitches.hideIsland && !debugSwitches.hideAllGameObjects) this.drawIsland(coastline)

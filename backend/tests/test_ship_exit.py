@@ -1,3 +1,6 @@
+import math
+
+import pytest
 from sqlalchemy import select
 
 from app.game.island_geometry import position_is_on_island, wreck_and_spawn
@@ -36,8 +39,22 @@ def test_first_exit_spawns_by_wreck_and_repeat_is_idempotent(client, users, db):
 
 
 def test_wreck_is_deterministic_and_inland():
-    for seed in (1, 2, 42, 999999):
+    for seed in range(50):
         first = wreck_and_spawn(seed)
         assert first == wreck_and_spawn(seed)
         assert all(position_is_on_island(seed, *point) for point in first)
+        wreck, spawn = first
+        assert 150 < math.dist(wreck, spawn) < 210
     assert wreck_and_spawn(1) != wreck_and_spawn(2)
+
+
+def test_wreck_gangway_spawn_matches_cross_language_fixtures():
+    fixtures = {
+        0: ((4470.410566619449, 2430.5958188382133), (4316.417661140205, 2547.8226940079485)),
+        1: ((4770.354924715217, 2531.624048712478), (4596.583144744758, 2616.825713519561)),
+        42: ((1959.9712251534202, 4210.019904735874), (1965.51926806239, 4016.5640327136466)),
+    }
+    for seed, expected in fixtures.items():
+        wreck, spawn = wreck_and_spawn(seed)
+        assert wreck == pytest.approx(expected[0])
+        assert spawn == pytest.approx(expected[1])
