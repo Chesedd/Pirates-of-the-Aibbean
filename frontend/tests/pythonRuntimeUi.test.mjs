@@ -39,7 +39,7 @@ test('the editor disables expensive Monaco features and exposes development diag
 })
 
 test('development switches isolate editor, scene, renderer, island, UI, and automatic layout', () => {
-  for (const query of ['disableEditor', 'minimalEditor', 'disableCanvas', 'editorOnly', 'disableAutomaticLayout',
+  for (const query of ['forceEditorOpen', 'disableEditor', 'minimalEditor', 'disableCanvas', 'editorOnly', 'disableAutomaticLayout',
     'disableRendering', 'disablePhaserRenderer', 'hideAllGameObjects', 'hideIsland', 'hidePlayer',
     'disableCameraFollow', 'disableWebGLPostFX', 'rendererRestartExperiment', 'disableScene', 'staticIsland']) {
     assert.match(diagnostics, new RegExp(`query\\.get\\('${query}'\\)`))
@@ -48,6 +48,12 @@ test('development switches isolate editor, scene, renderer, island, UI, and auto
   assert.match(codeArea, /function MinimalCodeEditor[\s\S]*?<Editor theme="vs-dark" defaultValue=\{initialCode\}/)
   assert.match(codeArea, /automaticLayout: !debugSwitches\.disableAutomaticLayout/)
   assert.match(userPage, /!debugSwitches\.disableCanvas && !debugSwitches\.disableScene && <GameCanvas/)
+})
+
+test('forceEditorOpen opens the full editor independently of Phaser without enabling editor-only layout', () => {
+  assert.match(userPage, /useState\(debugSwitches\.editorOnly \|\| debugSwitches\.forceEditorOpen\)/)
+  assert.doesNotMatch(userPage, /debugSwitches\.forceEditorOpen\s*\?\s*['"]editor-only/)
+  assert.doesNotMatch(codeArea, /debugSwitches\.forceEditorOpen/)
 })
 
 test('input latency probe reports native input and next-paint samples without React state', () => {

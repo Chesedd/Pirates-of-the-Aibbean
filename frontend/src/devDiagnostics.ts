@@ -5,6 +5,7 @@ const query = devDiagnosticsEnabled && typeof window !== 'undefined'
   : new URLSearchParams()
 
 export const debugSwitches = {
+  forceEditorOpen: query.get('forceEditorOpen') === 'true',
   disableEditor: query.get('disableEditor') === 'true',
   minimalEditor: query.get('minimalEditor') === 'true',
   disableCanvas: query.get('disableCanvas') === 'true',
