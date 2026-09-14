@@ -51,3 +51,11 @@ test('cargo and plank quantities stay within the requested ranges', () => {
     assert.ok(large >= 1 && large <= 3)
   }
 })
+
+test('procedural debris preserves the player exclusion radius', () => {
+  const { coastline, layout, spawn } = fixture(42)
+  for (const item of generateWreckDebris(42, layout, coastline, spawn).items) {
+    const radius = ['hull-section', 'spar', 'deck-section'].includes(item.kind) ? 58 : item.kind === 'plank-group' ? 38 : 28
+    assert.ok(Math.hypot(item.x - spawn.x, item.y - spawn.y) >= radius + 110)
+  }
+})

@@ -1,4 +1,4 @@
-import { ISLAND_CENTER, type Point } from './islandGeometry.js'
+import { ISLAND_CENTER, pointIsInsideIsland, type Point } from './islandGeometry.js'
 
 export type WreckCollider =
   | { kind: 'orientedRect'; id: string; x: number; y: number; halfWidth: number; halfHeight: number; angle: number }
@@ -66,7 +66,10 @@ export function createWreckLayout(seed: number, anchor: Point): WreckLayout {
       // Only physical deck features are solid; raised deck planking remains walkable.
       circle('mast-stump', 8, -6, 27),
       rect('companionway-hole', -77, 0, 35, 18),
-      rect('deck-cargo', 231, 40, 47, 25),
+      // Match the separately drawn crate and barrel instead of blocking the
+      // otherwise empty strip of deck between them.
+      rect('deck-crate', 212, 46, 22, 22),
+      circle('deck-barrel', 259, 48, 20),
       circle('breach', 158, -70, 28),
       rect('shore-cargo', 408, 208, 53, 32),
     ],
@@ -74,21 +77,54 @@ export function createWreckLayout(seed: number, anchor: Point): WreckLayout {
 }
 
 export function isWreckPositionWalkable(point: Point, layout: WreckLayout): boolean {
-  return !layout.colliders.some((collider) => {
-    if (collider.kind === 'circle') {
-      return Math.hypot(point.x - collider.x, point.y - collider.y) < collider.radius + PLAYER_RADIUS
+  return findBlockingWreckCollider(point, layout) === null
+}
+
+/** Returns the concrete obstacle responsible for a rejected position. */
+export function findBlockingWreckCollider(point: Point, layout: WreckLayout): string | null {
+  let blocking: { id: string; penetration: number } | null = null
+  for (const collider of layout.colliders) {
+    const penetration = colliderPenetration(point, collider)
+    if (penetration > 0 && (!blocking || penetration > blocking.penetration)) blocking = { id: collider.id, penetration }
+  }
+  return blocking?.id ?? null
+}
+
+function colliderPenetration(point: Point, collider: WreckCollider): number {
+  if (collider.kind === 'circle') {
+    return collider.radius + PLAYER_RADIUS - Math.hypot(point.x - collider.x, point.y - collider.y)
+  }
+  const dx = point.x - collider.x
+  const dy = point.y - collider.y
+  const localX = dx * Math.cos(collider.angle) + dy * Math.sin(collider.angle)
+  const localY = -dx * Math.sin(collider.angle) + dy * Math.cos(collider.angle)
+  return Math.min(collider.halfWidth + PLAYER_RADIUS - Math.abs(localX),
+    collider.halfHeight + PLAYER_RADIUS - Math.abs(localY))
+}
+
+function wreckPenetration(point: Point, layout: WreckLayout): number {
+  return layout.colliders.reduce((total, collider) => total + Math.max(0, colliderPenetration(point, collider)), 0)
+}
+
+/** Finds the nearest dry, collision-free point while favouring small local corrections. */
+export function recoverWreckPosition(point: Point, layout: WreckLayout, coastline: readonly Point[]): Point {
+  if (isWreckPositionWalkable(point, layout) && pointIsInsideIsland(point, coastline as Point[])) return point
+  for (let radius = 8; radius <= 192; radius += 8) {
+    const directions = Math.max(16, Math.ceil(Math.PI * 2 * radius / 8))
+    for (let index = 0; index < directions; index += 1) {
+      const angle = index / directions * Math.PI * 2
+      const candidate = { x: point.x + Math.cos(angle) * radius, y: point.y + Math.sin(angle) * radius }
+      if (pointIsInsideIsland(candidate, coastline as Point[]) && isWreckPositionWalkable(candidate, layout)) return candidate
     }
-    const dx = point.x - collider.x
-    const dy = point.y - collider.y
-    const localX = dx * Math.cos(collider.angle) + dy * Math.sin(collider.angle)
-    const localY = -dx * Math.sin(collider.angle) + dy * Math.cos(collider.angle)
-    return Math.abs(localX) < collider.halfWidth + PLAYER_RADIUS
-      && Math.abs(localY) < collider.halfHeight + PLAYER_RADIUS
-  })
+  }
+  // The approach is generated on dry land and is the safe deterministic fallback.
+  return layout.entranceApproach
 }
 
 export function resolveWreckMovement(previous: Point, target: Point, layout: WreckLayout): Point {
   if (isWreckPositionWalkable(target, layout)) return target
+  const previousPenetration = wreckPenetration(previous, layout)
+  if (previousPenetration > 0 && wreckPenetration(target, layout) < previousPenetration) return target
   if (isWreckPositionWalkable({ x: target.x, y: previous.y }, layout)) return { x: target.x, y: previous.y }
   if (isWreckPositionWalkable({ x: previous.x, y: target.y }, layout)) return { x: previous.x, y: target.y }
   return previous

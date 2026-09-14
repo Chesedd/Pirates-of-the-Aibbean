@@ -5,6 +5,7 @@ ISLAND_SIZE = 5200
 ISLAND_CENTER = ISLAND_SIZE // 2
 ISLAND_VERTEX_COUNT = 144
 SAFE_SPAWN = (ISLAND_CENTER, ISLAND_CENTER)
+WRECK_REFERENCE_SCALE = 0.72
 
 
 def _u32(value: int) -> int:
@@ -73,7 +74,7 @@ def position_is_on_island(seed: int, x: float, y: float) -> bool:
 
 
 def wreck_and_spawn(seed: int) -> tuple[tuple[float, float], tuple[float, float]]:
-    """Return deterministic, inland wreck and adjacent player spawn points."""
+    """Return the wreck anchor and the frontend-equivalent gangway approach."""
     coastline = generate_island_geometry(seed)
     shore_x, shore_y = coastline[_u32(seed) % len(coastline)]
     length = math.hypot(ISLAND_CENTER - shore_x, ISLAND_CENTER - shore_y)
@@ -87,4 +88,16 @@ def wreck_and_spawn(seed: int) -> tuple[tuple[float, float], tuple[float, float]
             point = (shore_x + unit_x * distance, shore_y + unit_y * distance)
         return point
 
-    return inland(180), inland(310)
+    wreck = inland(180)
+    inward_angle = math.atan2(ISLAND_CENTER - wreck[1], ISLAND_CENTER - wreck[0])
+    # JavaScript performs this multiplication as an IEEE-754 double before >>> 0.
+    mixed_seed = int(float(_u32(seed)) * 2654435761) & 0xFFFFFFFF
+    jitter = (mixed_seed / 0xFFFFFFFF - 0.5) * 0.22
+    wreck_angle = inward_angle - math.pi / 2 + jitter
+    local_x = 117 * WRECK_REFERENCE_SCALE
+    local_y = 242 * WRECK_REFERENCE_SCALE
+    spawn = (
+        wreck[0] + local_x * math.cos(wreck_angle) - local_y * math.sin(wreck_angle),
+        wreck[1] + local_x * math.sin(wreck_angle) + local_y * math.cos(wreck_angle),
+    )
+    return wreck, spawn
