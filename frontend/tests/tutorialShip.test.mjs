@@ -54,7 +54,9 @@ test('cabin walls and locked hatch filter logical targets before interpolation',
 
 test('movement unlock updates the existing scene without rebuilding Phaser', () => {
   const canvas = readFileSync(new URL('../src/game/GameCanvas.tsx', import.meta.url), 'utf8')
-  assert.match(canvas, /tutorial\?\.setMovementUnlocked\?\.\(movementUnlocked\)/)
+  assert.match(canvas, /registry\.set\('movementUnlocked', movementUnlocked\)/)
+  assert.match(scene, /changedata-movementUnlocked/)
+  assert.match(scene, /this\.setMovementUnlocked\(Boolean\(unlocked\)\)/)
   assert.doesNotMatch(canvas, /\[island, bridge, username, onPlayerClick, movementUnlocked/)
 })
 

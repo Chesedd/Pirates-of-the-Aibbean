@@ -26,6 +26,9 @@ export class TutorialShipScene extends Phaser.Scene {
   private movementUnlocked = false
   private exiting = false
   private hatch?: Phaser.GameObjects.Rectangle
+  private readonly handleMovementUnlock = (_parent: unknown, unlocked: unknown) => {
+    this.setMovementUnlocked(Boolean(unlocked))
+  }
 
   constructor() { super('tutorial-ship') }
 
@@ -50,11 +53,13 @@ export class TutorialShipScene extends Phaser.Scene {
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
     this.bridge.setPositionPersistenceEnabled(false)
     this.setMovementUnlocked(Boolean(this.registry.get('movementUnlocked')))
+    this.registry.events.on('changedata-movementUnlocked', this.handleMovementUnlock)
     this.keys = new GameKeyboardState(this.input.keyboard!)
     const lifecycle = this.registry.get('sceneLifecycle') as SceneLifecycleCallbacks
     lifecycle.onReady(this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       if (!debugSwitches.disableCameraFollow) this.scale.off(Phaser.Scale.Events.RESIZE, this.fitCabinToViewport, this)
+      this.registry.events.off('changedata-movementUnlocked', this.handleMovementUnlock)
       this.keys.dispose()
       lifecycle.onShutdown(this)
     })

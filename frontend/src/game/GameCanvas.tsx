@@ -61,10 +61,9 @@ export const GameCanvas = memo(function GameCanvas({ island, bridge, username, k
   useEffect(() => {
     const game = gameRef.current
     if (!game) return
+    // Phaser's registry event updates the already-running cabin scene in place.
     game.registry.set('movementUnlocked', movementUnlocked)
     bridge.setMovementUnlocked(movementUnlocked)
-    const tutorial = game.scene.getScene('tutorial-ship') as { setMovementUnlocked?: (value: boolean) => void }
-    tutorial?.setMovementUnlocked?.(movementUnlocked)
   }, [bridge, movementUnlocked])
 
   useEffect(() => diagnosticsRef.current?.setEditorOpen(editorOpen), [editorOpen])
