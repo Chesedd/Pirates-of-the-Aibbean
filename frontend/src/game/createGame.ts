@@ -18,6 +18,8 @@ export function createGame(
   username: string,
   onPlayerClick: () => void,
   movementUnlocked: boolean,
+  shipExited: boolean,
+  onShipExited: (island: Island) => void,
   onJournalClick: () => void,
   sceneLifecycle: SceneLifecycleCallbacks,
 ): Phaser.Game {
@@ -33,7 +35,7 @@ export function createGame(
       width: '100%',
       height: '100%',
     },
-    scene: movementUnlocked ? IslandScene : TutorialShipScene,
+    scene: shipExited ? [IslandScene, TutorialShipScene] : [TutorialShipScene, IslandScene],
     callbacks: {
       preBoot: (game) => {
         game.registry.set('island', island)
@@ -41,6 +43,8 @@ export function createGame(
         game.registry.set('username', username)
         game.registry.set('onPlayerClick', onPlayerClick)
         game.registry.set('onJournalClick', onJournalClick)
+        game.registry.set('movementUnlocked', movementUnlocked)
+        game.registry.set('onShipExited', onShipExited)
         game.registry.set('sceneLifecycle', sceneLifecycle)
       },
     },

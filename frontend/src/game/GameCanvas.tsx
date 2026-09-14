@@ -13,11 +13,13 @@ type GameCanvasProps = {
   keyboardEnabled: boolean
   onPlayerClick: () => void
   movementUnlocked: boolean
+  shipExited: boolean
+  onShipExited: (island: Island) => void
   editorOpen: boolean
   onJournalClick: () => void
 }
 
-export const GameCanvas = memo(function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick, movementUnlocked, editorOpen, onJournalClick }: GameCanvasProps) {
+export const GameCanvas = memo(function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick, movementUnlocked, shipExited, onShipExited, editorOpen, onJournalClick }: GameCanvasProps) {
   const renderCount = useRef(0)
   if (devDiagnosticsEnabled) devCount('GameCanvas container render', ++renderCount.current)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -25,6 +27,9 @@ export const GameCanvas = memo(function GameCanvas({ island, bridge, username, k
   const lifecycleRef = useRef<GameSceneLifecycle | null>(null)
   const diagnosticsRef = useRef<PhaserDiagnostics | null>(null)
   const keyboardEnabledRef = useRef(keyboardEnabled)
+  const initialState = useRef({ island, movementUnlocked, shipExited })
+  const callbacks = useRef({ onPlayerClick, onJournalClick, onShipExited })
+  callbacks.current = { onPlayerClick, onJournalClick, onShipExited }
   keyboardEnabledRef.current = keyboardEnabled
 
   useEffect(() => {
@@ -32,7 +37,8 @@ export const GameCanvas = memo(function GameCanvas({ island, bridge, username, k
 
     const lifecycle = new GameSceneLifecycle(keyboardEnabledRef.current)
     lifecycleRef.current = lifecycle
-    const game = createGame(containerRef.current, island, bridge, username, onPlayerClick, movementUnlocked, onJournalClick, {
+    const state = initialState.current
+    const game = createGame(containerRef.current, state.island, bridge, username, () => callbacks.current.onPlayerClick(), state.movementUnlocked, state.shipExited, (value) => callbacks.current.onShipExited(value), () => callbacks.current.onJournalClick(), {
       onReady: (scene) => lifecycle.sceneReady(scene),
       onShutdown: (scene) => lifecycle.sceneShutdown(scene),
     })
@@ -50,7 +56,16 @@ export const GameCanvas = memo(function GameCanvas({ island, bridge, username, k
       if (gameRef.current === game) gameRef.current = null
       game.destroy(true)
     }
-  }, [island, bridge, username, onPlayerClick, movementUnlocked, onJournalClick])
+  }, [bridge, username])
+
+  useEffect(() => {
+    const game = gameRef.current
+    if (!game) return
+    game.registry.set('movementUnlocked', movementUnlocked)
+    bridge.setMovementUnlocked(movementUnlocked)
+    const tutorial = game.scene.getScene('tutorial-ship') as { setMovementUnlocked?: (value: boolean) => void }
+    tutorial?.setMovementUnlocked?.(movementUnlocked)
+  }, [bridge, movementUnlocked])
 
   useEffect(() => diagnosticsRef.current?.setEditorOpen(editorOpen), [editorOpen])
 

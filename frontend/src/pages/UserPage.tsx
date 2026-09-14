@@ -8,7 +8,7 @@ import { GamePythonBridge } from '../game/GamePythonBridge'
 import { TutorialJournal, type TutorialState } from '../components/TutorialJournal'
 import { debugSwitches } from '../devDiagnostics'
 
-export type Island = { id: number; generation_seed: number; player: { x: number; y: number } }
+export type Island = { id: number; generation_seed: number; player: { x: number; y: number }; wreck: { x: number; y: number } }
 export type Progress = { unlocks: string[] }
 type PythonRuntime = { runner: ReturnType<typeof createBrowserPythonRunner>; bridge: GamePythonBridge }
 
@@ -53,6 +53,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
   }, [])
 
   const movementUnlocked = progress?.unlocks.includes('movement') ?? false
+  const shipExited = progress?.unlocks.includes('tutorial_ship_exited') ?? false
   useEffect(() => runtime?.bridge.setMovementUnlocked(movementUnlocked), [runtime, movementUnlocked])
 
   const openEditor = useCallback(() => setIsEditorOpen(true), [])
@@ -72,7 +73,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
 
   return <main className={`game-page ${debugSwitches.editorOnly ? 'editor-only' : ''}`}>
     {!debugSwitches.editorOnly && <header className="game-header">
-      <div><h1>{movementUnlocked ? 'Your island' : 'Разбитый корабль'}</h1><p>Captain <strong>{user.username}</strong></p></div>
+      <div><h1>{shipExited ? 'Your island' : 'Разбитый корабль'}</h1><p>Captain <strong>{user.username}</strong></p></div>
       <button className="secondary" onClick={onLogout}>Logout</button>
     </header>}
     <div className={`game-workspace ${isEditorOpen ? 'editor-open' : ''}`}>
@@ -86,6 +87,11 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
           keyboardEnabled={!isEditorFocused}
           onPlayerClick={openEditor}
           movementUnlocked={movementUnlocked}
+          shipExited={shipExited}
+          onShipExited={(nextIsland) => {
+            setIsland(nextIsland)
+            setProgress((current) => current && ({ unlocks: [...new Set([...current.unlocks, 'tutorial_ship_exited'])] }))
+          }}
           editorOpen={isEditorOpen || journalOpen}
           onJournalClick={openJournal}
         />}
