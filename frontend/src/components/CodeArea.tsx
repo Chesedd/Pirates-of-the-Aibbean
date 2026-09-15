@@ -5,6 +5,7 @@ import type { PythonRunner } from '../python/PythonRunner'
 import type { GamePythonBridge } from '../game/GamePythonBridge'
 import type { PythonRuntimeState } from '../python/pythonProtocol'
 import { bindEditorKeyboardFocus } from './editorKeyboardFocus'
+import { applyAndPersistPlayerCode } from './applyPlayerCode'
 import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, installInputLatencyProbe, type EditorDiagnosticMode } from '../devDiagnostics'
 
 type CodeResponse = { code: string }
@@ -196,13 +197,38 @@ export const CodeArea = memo(function CodeArea({ runner, bridge, gameOutput, isO
   const apply = useCallback(async () => {
     setIsRunning(true)
     setOutput('')
-    await bridge.apply(readCode())
-    setIsRunning(false)
+    setError('')
+    const code = readCode()
+    try {
+      const result = await applyAndPersistPlayerCode(
+        code,
+        (source) => bridge.apply(source),
+        (source) => apiRequest<CodeResponse>('/game/code', {
+          method: 'PUT',
+          body: JSON.stringify({ code: source }),
+        }),
+      )
+      if (!result.applied) {
+        saveStateRef.current = 'unsaved'
+        setState('unsaved')
+        return
+      }
+      if (!result.saved) {
+        setError(`Program applied, but could not save player.py: ${result.error.message}`)
+        saveStateRef.current = 'unsaved'
+        setState('unsaved')
+        return
+      }
+      saveStateRef.current = 'saved'
+      setState('saved')
+    } finally {
+      setIsRunning(false)
+    }
   }, [bridge, readCode])
 
   const displayedState = saveStateRef.current
   const status = { loading: 'Loading…', saved: 'Saved', unsaved: 'Unsaved changes', saving: 'Saving…' }[displayedState]
-  const displayedError = displayedState === 'unsaved' ? '' : error
+  const displayedError = error
 
   return <section className="code-panel" aria-labelledby="code-title" hidden={!isOpen}>
     {!debugSwitches.editorOnly && <div className="code-panel-header">

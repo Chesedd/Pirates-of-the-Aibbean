@@ -29,9 +29,13 @@ export class GamePythonBridge {
     this.coastline = coastline
   }
 
+  /** Removes scene-owned island boundaries when movement happens in another world space. */
+  clearIslandGeometry(): void {
+    this.coastline = null
+  }
+
   setMovementUnlocked(unlocked: boolean): void {
     this.movementUnlocked = unlocked
-    if (!unlocked) this.coastline = null
   }
 
   setPositionPersistenceEnabled(enabled: boolean): void {
