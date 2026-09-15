@@ -4,17 +4,19 @@ import type { WreckLayout } from './wreckGeometry.js'
 export type WreckDebrisKind = 'crate' | 'barrel' | 'plank-group' | 'hull-section' | 'spar' | 'deck-section'
 
 export type DebrisPhysicsConfig = {
-  mass: number; pushable: boolean; drag: number; slideFactor: number; maxSpeed: number
-  pushCoefficient: number; width?: number; height?: number; radius?: number
+  mass: number; pushable: boolean; damping: number; slideFactor: number; maxSpeed: number
+  pushCoefficient: number; angularResistance: number; angularDrag: number; maxAngularVelocity: number
+  rotationEnabled: boolean; width?: number; height?: number; radius?: number
 }
 export const PLAYER_PUSH_POWER = 1
 export const DEBRIS_PHYSICS: Readonly<Record<WreckDebrisKind, DebrisPhysicsConfig>> = {
-  'plank-group': { mass: .55, pushable: true, drag: 300, slideFactor: .7, maxSpeed: 130, pushCoefficient: .9, width: 82, height: 20 },
-  crate: { mass: 1.5, pushable: true, drag: 600, slideFactor: .35, maxSpeed: 80, pushCoefficient: .5, width: 36, height: 36 },
-  barrel: { mass: 1.25, pushable: true, drag: 475, slideFactor: .45, maxSpeed: 95, pushCoefficient: .65, radius: 17 },
-  spar: { mass: 3, pushable: true, drag: 800, slideFactor: .15, maxSpeed: 45, pushCoefficient: .25, width: 112, height: 14 },
-  'deck-section': { mass: 5, pushable: true, drag: 1000, slideFactor: .08, maxSpeed: 24, pushCoefficient: .08, width: 100, height: 42 },
-  'hull-section': { mass: 9, pushable: false, drag: 1200, slideFactor: 0, maxSpeed: 0, pushCoefficient: 0, width: 112, height: 40 },
+  // Compact, mostly symmetrical bodies avoid pretending that Arcade owns rotating oriented rectangles.
+  'plank-group': { mass: .55, pushable: true, damping: .86, slideFactor: .65, maxSpeed: 120, pushCoefficient: .9, angularResistance: .5, angularDrag: 145, maxAngularVelocity: 180, rotationEnabled: true, width: 54, height: 18 },
+  barrel: { mass: 1.25, pushable: true, damping: .80, slideFactor: .5, maxSpeed: 95, pushCoefficient: .65, angularResistance: .8, angularDrag: 190, maxAngularVelocity: 150, rotationEnabled: true, radius: 17 },
+  crate: { mass: 1.5, pushable: true, damping: .72, slideFactor: .35, maxSpeed: 75, pushCoefficient: .5, angularResistance: 1.4, angularDrag: 220, maxAngularVelocity: 110, rotationEnabled: true, radius: 18 },
+  spar: { mass: 3, pushable: true, damping: .55, slideFactor: .18, maxSpeed: 45, pushCoefficient: .25, angularResistance: 2, angularDrag: 150, maxAngularVelocity: 80, rotationEnabled: true, width: 48, height: 14 },
+  'deck-section': { mass: 5, pushable: true, damping: .35, slideFactor: .05, maxSpeed: 25, pushCoefficient: .08, angularResistance: 4.5, angularDrag: 180, maxAngularVelocity: 30, rotationEnabled: true, radius: 25 },
+  'hull-section': { mass: 9, pushable: false, damping: .35, slideFactor: 0, maxSpeed: 0, pushCoefficient: 0, angularResistance: 8, angularDrag: 0, maxAngularVelocity: 0, rotationEnabled: false, width: 112, height: 40 },
 }
 
 export function debrisPushVelocity(kind: WreckDebrisKind, playerVelocity: Point): Point {
@@ -27,9 +29,22 @@ export function debrisPushVelocity(kind: WreckDebrisKind, playerVelocity: Point)
 }
 
 export function applyDebrisDrag(velocity: Point, kind: WreckDebrisKind, deltaSeconds: number): Point {
-  const length = Math.hypot(velocity.x, velocity.y)
-  const nextSpeed = Math.max(0, length - DEBRIS_PHYSICS[kind].drag * deltaSeconds)
-  return length ? { x: velocity.x / length * nextSpeed, y: velocity.y / length * nextSpeed } : { x: 0, y: 0 }
+  const multiplier = Math.pow(DEBRIS_PHYSICS[kind].damping, deltaSeconds)
+  return { x: velocity.x * multiplier, y: velocity.y * multiplier }
+}
+
+export const ROTATION_PUSH_SCALE = 1.15
+
+/** Arcade has no contact manifold, so callers supply an approximate contact point. */
+export function debrisAngularImpulse(kind: WreckDebrisKind, center: Point, contact: Point, impactVelocity: Point, scale = 1): number {
+  const config = DEBRIS_PHYSICS[kind]
+  if (!config.rotationEnabled) return 0
+  const extent = Math.max(config.radius ?? 0, (config.width ?? 0) / 2, (config.height ?? 0) / 2, 1)
+  const rx = (contact.x - center.x) / extent
+  const ry = (contact.y - center.y) / extent
+  const torque = rx * impactVelocity.y - ry * impactVelocity.x
+  const impulse = torque * ROTATION_PUSH_SCALE * scale / config.angularResistance
+  return Math.max(-config.maxAngularVelocity, Math.min(config.maxAngularVelocity, impulse))
 }
 
 export type WreckDebris = Point & {

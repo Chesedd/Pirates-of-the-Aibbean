@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { generateIslandGeometry, ISLAND_CENTER, pointIsInsideIsland } from '../.test-dist/game/islandGeometry.js'
 import { createWreckLayout } from '../.test-dist/game/wreckGeometry.js'
-import { applyDebrisDrag, debrisPushVelocity, generateWreckDebris, isValidWreckDebrisPosition } from '../.test-dist/game/wreckDebris.js'
+import { applyDebrisDrag, debrisAngularImpulse, debrisPushVelocity, generateWreckDebris, isValidWreckDebrisPosition } from '../.test-dist/game/wreckDebris.js'
 
 function fixture(seed) {
   const coastline = generateIslandGeometry(seed)
@@ -71,8 +71,27 @@ test('push resistance makes plank, crate, spar, and hull progressively harder to
 })
 
 test('debris drag decays motion cleanly to zero', () => {
-  const slower = applyDebrisDrag({ x: 80, y: 0 }, 'plank-group', .1)
-  const stopped = applyDebrisDrag(slower, 'plank-group', 1)
-  assert.ok(slower.x > 0 && slower.x < 80)
-  assert.deepEqual(stopped, { x: 0, y: 0 })
+  const slower = applyDebrisDrag({ x: 100, y: 0 }, 'crate', 1)
+  const settled = applyDebrisDrag({ x: 100, y: 0 }, 'crate', 12)
+  assert.ok(slower.x > 0 && slower.x < 100)
+  assert.ok(settled.x < 3)
+})
+
+test('off-center impacts spin more than centered impacts and opposite offsets reverse spin', () => {
+  const center = { x: 0, y: 0 }, velocity = { x: 100, y: 0 }
+  const centerHit = debrisAngularImpulse('crate', center, center, velocity)
+  const topHit = debrisAngularImpulse('crate', center, { x: 0, y: -16 }, velocity)
+  const bottomHit = debrisAngularImpulse('crate', center, { x: 0, y: 16 }, velocity)
+  assert.ok(Math.abs(topHit) > Math.abs(centerHit))
+  assert.notEqual(topHit, 0)
+  assert.equal(Math.sign(topHit), -Math.sign(bottomHit))
+})
+
+test('angular resistance makes light debris spin more than heavy debris', () => {
+  const center = { x: 0, y: 0 }, contact = { x: 0, y: -5 }, velocity = { x: 30, y: 0 }
+  const plank = Math.abs(debrisAngularImpulse('plank-group', center, contact, velocity))
+  const crate = Math.abs(debrisAngularImpulse('crate', center, contact, velocity))
+  const deck = Math.abs(debrisAngularImpulse('deck-section', center, contact, velocity))
+  assert.ok(plank > crate && crate > deck)
+  assert.equal(debrisAngularImpulse('hull-section', center, contact, velocity), 0)
 })
