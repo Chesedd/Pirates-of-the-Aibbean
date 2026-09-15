@@ -48,7 +48,7 @@ test('raw movement can enter the companionway trigger before hole collision reje
   const previous = wreckLocalToWorld(anchor, layout.angle, -145, 0)
   const target = wreckLocalToWorld(anchor, layout.angle, -130, 0)
   assert.equal(entersCompanionway(previous, target, layout), true)
-  assert.notDeepEqual(resolveWreckMovement(previous, target, layout), target)
+  assert.deepEqual(resolveWreckMovement(previous, target, layout), target)
   const alongsideStart = wreckLocalToWorld(anchor, layout.angle, -145, 35)
   const alongsideTarget = wreckLocalToWorld(anchor, layout.angle, -130, 35)
   assert.equal(entersCompanionway(alongsideStart, alongsideTarget, layout), false)
@@ -56,7 +56,7 @@ test('raw movement can enter the companionway trigger before hole collision reje
 
 test('real deck obstacles and hull sides are blocked, but nearby ground is not', () => {
   const layout = createWreckLayout(42, anchor)
-  for (const local of [[8, -6], [-77, 0], [-205, -125]]) {
+  for (const local of [[8, -6], [-205, -125]]) {
     assert.equal(isWreckPositionWalkable(wreckLocalToWorld(anchor, layout.angle, ...local), layout), false)
   }
   assert.equal(isWreckPositionWalkable(wreckLocalToWorld(anchor, layout.angle, -50, -190), layout), true)

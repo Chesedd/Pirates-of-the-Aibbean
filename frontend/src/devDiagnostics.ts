@@ -24,6 +24,7 @@ export const debugSwitches = {
   rendererRestartExperiment: query.get('rendererRestartExperiment') === 'true',
   disableScene: query.get('disableScene') === 'true',
   staticIsland: query.get('staticIsland') === 'true',
+  debugCollision: query.get('debugCollision') === 'true',
 } as const
 
 export type EditorDiagnosticMode = 'textarea' | 'minimal Monaco' | 'full Monaco'

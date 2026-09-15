@@ -7,6 +7,7 @@ import { createBrowserPythonRunner } from '../python/PythonRunner'
 import { GamePythonBridge } from '../game/GamePythonBridge'
 import { TutorialJournal, type TutorialState } from '../components/TutorialJournal'
 import { debugSwitches } from '../devDiagnostics'
+import { GAME_LOCATIONS, type GameLocationId } from '../game/locations/gameLocations'
 
 export type Island = { id: number; generation_seed: number; player: { x: number; y: number }; wreck: { x: number; y: number } }
 export type Progress = { unlocks: string[] }
@@ -23,6 +24,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
   const [isEditorFocused, setIsEditorFocused] = useState(false)
   const [runtime, setRuntime] = useState<PythonRuntime | null>(null)
   const [tutorial, setTutorial] = useState<TutorialState | null>(null)
+  const [currentLocation, setCurrentLocation] = useState<GameLocationId>('wreck-cabin')
 
   useEffect(() => {
     const runner = createBrowserPythonRunner()
@@ -54,6 +56,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
 
   const movementUnlocked = progress?.unlocks.includes('movement') ?? false
   const shipExited = progress?.unlocks.includes('tutorial_ship_exited') ?? false
+  useEffect(() => { if (progress) setCurrentLocation(shipExited ? 'island' : 'wreck-cabin') }, [progress, shipExited])
   useEffect(() => runtime?.bridge.setMovementUnlocked(movementUnlocked), [runtime, movementUnlocked])
 
   const openEditor = useCallback(() => setIsEditorOpen(true), [])
@@ -73,7 +76,7 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
 
   return <main className={`game-page ${debugSwitches.editorOnly ? 'editor-only' : ''}`}>
     {!debugSwitches.editorOnly && <header className="game-header">
-      <div><h1>{shipExited ? 'Your island' : 'Разбитый корабль'}</h1><p>Captain <strong>{user.username}</strong></p></div>
+      <div><h1>{GAME_LOCATIONS[currentLocation].title}</h1><p>Captain <strong>{user.username}</strong></p></div>
       <button className="secondary" onClick={onLogout}>Logout</button>
     </header>}
     <div className={`game-workspace ${isEditorOpen ? 'editor-open' : ''}`}>
@@ -94,6 +97,9 @@ export function UserPage({ user, onLogout }: { user: User; onLogout: () => void 
           }}
           editorOpen={isEditorOpen || journalOpen}
           onJournalClick={openJournal}
+          currentLocation={currentLocation}
+          onLocationChange={setCurrentLocation}
+          onPersistenceError={(reason) => setError(`Position was not saved: ${reason.message}`)}
         />}
         {journalOpen && tutorial && <TutorialJournal initialState={tutorial} onClose={closeJournal} onProgress={setTutorial} onFinished={finishTutorial} onEditorFocusChange={setIsEditorFocused} />}
       </div>}

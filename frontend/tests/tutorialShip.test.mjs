@@ -2,13 +2,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-const scene = readFileSync(new URL('../src/game/scenes/TutorialShipScene.ts', import.meta.url), 'utf8')
+const scene = readFileSync(new URL('../src/game/scenes/ShipCabinScene.ts', import.meta.url), 'utf8')
 const page = readFileSync(new URL('../src/pages/UserPage.tsx', import.meta.url), 'utf8')
 const journal = readFileSync(new URL('../src/components/TutorialJournal.tsx', import.meta.url), 'utf8')
 
 test('ship exit, rather than movement, selects the initial scene', () => {
   const createGame = readFileSync(new URL('../src/game/createGame.ts', import.meta.url), 'utf8')
-  assert.match(createGame, /shipExited \? \[IslandScene, TutorialShipScene\] : \[TutorialShipScene, IslandScene\]/)
+  assert.match(createGame, /shipExited \? \[IslandScene, ShipCabinScene\] : \[ShipCabinScene, IslandScene\]/)
   assert.match(page, /progress\?\.unlocks\.includes\('movement'\)/)
 })
 
@@ -48,8 +48,8 @@ test('tutorial cabin contains a physical, server-authoritative exit', () => {
 
 test('companionway revisit skips tutorial side effects and returns to its deck point', () => {
   const islandScene = readFileSync(new URL('../src/game/scenes/IslandScene.ts', import.meta.url), 'utf8')
-  assert.match(islandScene, /entersCompanionway\(position, next, this\.wreckLayout\)/)
-  assert.match(islandScene, /scene\.start\('tutorial-ship', \{ mode: 'revisit' \}\)/)
+  assert.match(islandScene, /entersCompanionway\(request\.position, next, this\.wreckLayout\)/)
+  assert.match(islandScene, /location\.enter\(this, 'wreck-cabin', 'cabin-revisit', \{ mode: 'revisit' \}\)/)
   assert.match(scene, /CABIN_REENTRY_SPAWN = \{ x: 470, y: 455 \}/)
   assert.match(scene, /this\.mode === 'tutorial'.*this\.createStoryText\(\)/)
   assert.match(scene, /this\.mode === 'revisit' \|\| Boolean\(this\.registry\.get\('movementUnlocked'\)\)/)
@@ -62,13 +62,13 @@ test('scene transitions transfer ownership of island geometry in both directions
   const islandScene = readFileSync(new URL('../src/game/scenes/IslandScene.ts', import.meta.url), 'utf8')
   const cabinBridgeSetup = scene.slice(scene.indexOf("this.bridge = this.registry.get('pythonBridge')"), scene.indexOf("this.registry.events.on('changedata-movementUnlocked'"))
   assert.match(cabinBridgeSetup, /clearIslandGeometry\(\)[\s\S]*setPositionPersistenceEnabled\(false\)[\s\S]*setMovementUnlocked/)
-  assert.match(scene, /scene\.start\('island'\)/)
+  assert.match(scene, /location\.enter\(this, 'island', 'companionway-return'\)|scene\.start\('island'\)/)
   assert.match(islandScene, /setIslandGeometry\(coastline\)[\s\S]*setPositionPersistenceEnabled\(true\)/)
-  assert.match(islandScene, /scene\.start\('tutorial-ship', \{ mode: 'revisit' \}\)/)
+  assert.match(islandScene, /location\.enter\(this, 'wreck-cabin', 'cabin-revisit', \{ mode: 'revisit' \}\)/)
 })
 
 test('cabin walls and locked hatch filter logical targets before interpolation', () => {
-  assert.match(scene, /const accepted = cabinTarget\(position, next, this\.movementUnlocked\)/)
+  assert.match(scene, /const accepted = cabinTarget\(request\.position, next, this\.movementUnlocked\)/)
   assert.match(scene, /resolveCabinMovement\(previous, target, unlocked\)/)
   assert.match(scene, /setPositionPersistenceEnabled\(false\)/)
 })

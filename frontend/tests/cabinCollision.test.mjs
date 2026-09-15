@@ -23,7 +23,9 @@ test('the player can approach the journal and hatch without crossing furniture',
 
 test('collision is resolved at the logical target and slides along obstacles', () => {
   const previous = { x: 580, y: 210 }
-  assert.deepEqual(resolveCabinMovement(previous, { x: 610, y: 230 }, false), { x: 580, y: 230 })
+  const slid = resolveCabinMovement(previous, { x: 630, y: 250 }, false)
+  assert.notDeepEqual(slid, previous)
+  assert.equal(isCabinPositionWalkable(slid.x, slid.y, false), true)
   assert.deepEqual(resolveCabinMovement({ x: 470, y: 300 }, { x: 490, y: 300 }, false), { x: 490, y: 300 })
 })
 

@@ -1,8 +1,8 @@
 import { ISLAND_CENTER, pointIsInsideIsland, type Point } from './islandGeometry.js'
+import { findBlockingCollider, resolveTopDownMovement, type TopDownCollider } from './movement/TopDownMovementResolver.js'
+import { PLAYER_COLLISION_RADIUS } from './player/playerConfig.js'
 
-export type WreckCollider =
-  | { kind: 'orientedRect'; id: string; x: number; y: number; halfWidth: number; halfHeight: number; angle: number }
-  | { kind: 'circle'; id: string; x: number; y: number; radius: number }
+export type WreckCollider = TopDownCollider
 
 export type WreckLayout = {
   anchor: Point
@@ -17,7 +17,6 @@ export type WreckLayout = {
   colliders: readonly WreckCollider[]
 }
 
-const PLAYER_RADIUS = 18
 /** Scale used by both the v10 artwork and its collision model. */
 export const WRECK_REFERENCE_SCALE = 0.72
 
@@ -71,7 +70,7 @@ export function createWreckLayout(seed: number, anchor: Point): WreckLayout {
 
       // Only physical deck features are solid; raised deck planking remains walkable.
       circle('mast-stump', 8, -6, 27),
-      rect('companionway-hole', -77, 0, 35, 18),
+      // The companionway itself is a transition sensor, not a solid obstacle.
       // Match the separately drawn crate and barrel instead of blocking the
       // otherwise empty strip of deck between them.
       rect('deck-crate', 212, 46, 22, 22),
@@ -100,28 +99,7 @@ export function isWreckPositionWalkable(point: Point, layout: WreckLayout): bool
 
 /** Returns the concrete obstacle responsible for a rejected position. */
 export function findBlockingWreckCollider(point: Point, layout: WreckLayout): string | null {
-  let blocking: { id: string; penetration: number } | null = null
-  for (const collider of layout.colliders) {
-    const penetration = colliderPenetration(point, collider)
-    if (penetration > 0 && (!blocking || penetration > blocking.penetration)) blocking = { id: collider.id, penetration }
-  }
-  return blocking?.id ?? null
-}
-
-function colliderPenetration(point: Point, collider: WreckCollider): number {
-  if (collider.kind === 'circle') {
-    return collider.radius + PLAYER_RADIUS - Math.hypot(point.x - collider.x, point.y - collider.y)
-  }
-  const dx = point.x - collider.x
-  const dy = point.y - collider.y
-  const localX = dx * Math.cos(collider.angle) + dy * Math.sin(collider.angle)
-  const localY = -dx * Math.sin(collider.angle) + dy * Math.cos(collider.angle)
-  return Math.min(collider.halfWidth + PLAYER_RADIUS - Math.abs(localX),
-    collider.halfHeight + PLAYER_RADIUS - Math.abs(localY))
-}
-
-function wreckPenetration(point: Point, layout: WreckLayout): number {
-  return layout.colliders.reduce((total, collider) => total + Math.max(0, colliderPenetration(point, collider)), 0)
+  return findBlockingCollider(point, { colliders: layout.colliders }, PLAYER_COLLISION_RADIUS)
 }
 
 /** Finds the nearest dry, collision-free point while favouring small local corrections. */
@@ -140,10 +118,5 @@ export function recoverWreckPosition(point: Point, layout: WreckLayout, coastlin
 }
 
 export function resolveWreckMovement(previous: Point, target: Point, layout: WreckLayout): Point {
-  if (isWreckPositionWalkable(target, layout)) return target
-  const previousPenetration = wreckPenetration(previous, layout)
-  if (previousPenetration > 0 && wreckPenetration(target, layout) < previousPenetration) return target
-  if (isWreckPositionWalkable({ x: target.x, y: previous.y }, layout)) return { x: target.x, y: previous.y }
-  if (isWreckPositionWalkable({ x: previous.x, y: target.y }, layout)) return { x: previous.x, y: target.y }
-  return previous
+  return resolveTopDownMovement(previous, target, { colliders: layout.colliders }, PLAYER_COLLISION_RADIUS)
 }

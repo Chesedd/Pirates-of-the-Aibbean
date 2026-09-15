@@ -1,10 +1,12 @@
 import Phaser from 'phaser'
 import { IslandScene } from './scenes/IslandScene'
-import { TutorialShipScene } from './scenes/TutorialShipScene'
+import { ShipCabinScene } from './scenes/ShipCabinScene'
 import type { Island } from '../pages/UserPage'
 import type { GamePythonBridge } from './GamePythonBridge'
 import type { KeyboardScene } from './GameSceneLifecycle'
 import { debugSwitches } from '../devDiagnostics'
+import { LocationController } from './locations/LocationController'
+import type { GameLocationId } from './locations/gameLocations'
 
 export type SceneLifecycleCallbacks = {
   onReady: (scene: KeyboardScene) => void
@@ -22,6 +24,8 @@ export function createGame(
   onShipExited: (island: Island) => void,
   onJournalClick: () => void,
   sceneLifecycle: SceneLifecycleCallbacks,
+  onLocationChange: (location: GameLocationId) => void,
+  onPersistenceError: (reason: Error) => void,
 ): Phaser.Game {
   return new Phaser.Game({
     // HEADLESS preserves scene creation and updates while removing the renderer.
@@ -35,7 +39,7 @@ export function createGame(
       width: '100%',
       height: '100%',
     },
-    scene: shipExited ? [IslandScene, TutorialShipScene] : [TutorialShipScene, IslandScene],
+    scene: shipExited ? [IslandScene, ShipCabinScene] : [ShipCabinScene, IslandScene],
     callbacks: {
       preBoot: (game) => {
         game.registry.set('island', island)
@@ -46,6 +50,8 @@ export function createGame(
         game.registry.set('movementUnlocked', movementUnlocked)
         game.registry.set('onShipExited', onShipExited)
         game.registry.set('sceneLifecycle', sceneLifecycle)
+        game.registry.set('locationController', new LocationController(shipExited ? 'island' : 'wreck-cabin', onLocationChange))
+        game.registry.set('onPersistenceError', onPersistenceError)
       },
     },
   })
