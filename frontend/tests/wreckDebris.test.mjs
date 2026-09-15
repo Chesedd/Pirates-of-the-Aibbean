@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { generateIslandGeometry, ISLAND_CENTER, pointIsInsideIsland } from '../.test-dist/game/islandGeometry.js'
 import { createWreckLayout } from '../.test-dist/game/wreckGeometry.js'
-import { applyDebrisDrag, debrisAngularImpulse, debrisPushVelocity, generateWreckDebris, isValidWreckDebrisPosition } from '../.test-dist/game/wreckDebris.js'
+import { angularApproachSpeed, applyAngularDrag, applyDebrisDrag, debrisAngularImpulse, debrisPushVelocity, effectiveDebrisPhysics, generateWreckDebris, isValidWreckDebrisPosition, shouldApplyAngularImpact } from '../.test-dist/game/wreckDebris.js'
 
 function fixture(seed) {
   const coastline = generateIslandGeometry(seed)
@@ -87,11 +87,38 @@ test('off-center impacts spin more than centered impacts and opposite offsets re
   assert.equal(Math.sign(topHit), -Math.sign(bottomHit))
 })
 
-test('angular resistance makes light debris spin more than heavy debris', () => {
+test('heavier tuned planks resist spin while deck sections resist it most', () => {
   const center = { x: 0, y: 0 }, contact = { x: 0, y: -5 }, velocity = { x: 30, y: 0 }
   const plank = Math.abs(debrisAngularImpulse('plank-group', center, contact, velocity))
   const crate = Math.abs(debrisAngularImpulse('crate', center, contact, velocity))
   const deck = Math.abs(debrisAngularImpulse('deck-section', center, contact, velocity))
-  assert.ok(plank > crate && crate > deck)
+  assert.ok(crate > plank && plank > deck)
   assert.equal(debrisAngularImpulse('hull-section', center, contact, velocity), 0)
+})
+
+test('plank count and scale produce deterministic, moderately heavier physics', () => {
+  const one = effectiveDebrisPhysics('plank-group', 1, 1)
+  const three = effectiveDebrisPhysics('plank-group', 3, 1)
+  const largeThree = effectiveDebrisPhysics('plank-group', 3, 1.2)
+  assert.equal(one.mass, 1.2)
+  assert.equal(three.mass, 1.92)
+  assert.ok(largeThree.mass > three.mass && largeThree.mass < three.mass * 1.1)
+  assert.ok(debrisPushVelocity('plank-group', { x: 160, y: 0 }, one).x > debrisPushVelocity('plank-group', { x: 160, y: 0 }, three).x)
+  assert.ok(one.maxSpeed > three.maxSpeed && one.pushCoefficient > three.pushCoefficient && one.maxAngularVelocity > three.maxAngularVelocity)
+})
+
+test('angular drag decays a plank spin and sleep snaps it exactly to zero', () => {
+  let spin = 100
+  spin = applyAngularDrag(spin, 330, .1)
+  assert.ok(spin > 0 && spin < 100)
+  for (let frame = 0; frame < 60; frame += 1) spin = applyAngularDrag(spin, 330, 1 / 60)
+  assert.equal(spin, 0)
+})
+
+test('persistent and resting contacts cannot repeatedly apply angular impulses', () => {
+  const approach = angularApproachSpeed({ x: -60, y: 0 }, { x: 1, y: 0 })
+  assert.equal(shouldApplyAngularImpact(approach, false, 100), true)
+  assert.equal(shouldApplyAngularImpact(approach, true, 200), false, 'same persistent contact is not a new impact')
+  assert.equal(shouldApplyAngularImpact(0, false, 200), false, 'resting debris contact has no impact')
+  assert.equal(shouldApplyAngularImpact(approach, false, 50), false, 'new contact still observes pair cooldown')
 })
