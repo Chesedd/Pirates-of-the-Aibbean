@@ -3,11 +3,41 @@ import type { WreckLayout } from './wreckGeometry.js'
 
 export type WreckDebrisKind = 'crate' | 'barrel' | 'plank-group' | 'hull-section' | 'spar' | 'deck-section'
 
+export type DebrisPhysicsConfig = {
+  mass: number; pushable: boolean; drag: number; slideFactor: number; maxSpeed: number
+  pushCoefficient: number; width?: number; height?: number; radius?: number
+}
+export const PLAYER_PUSH_POWER = 1
+export const DEBRIS_PHYSICS: Readonly<Record<WreckDebrisKind, DebrisPhysicsConfig>> = {
+  'plank-group': { mass: .55, pushable: true, drag: 300, slideFactor: .7, maxSpeed: 130, pushCoefficient: .9, width: 82, height: 20 },
+  crate: { mass: 1.5, pushable: true, drag: 600, slideFactor: .35, maxSpeed: 80, pushCoefficient: .5, width: 36, height: 36 },
+  barrel: { mass: 1.25, pushable: true, drag: 475, slideFactor: .45, maxSpeed: 95, pushCoefficient: .65, radius: 17 },
+  spar: { mass: 3, pushable: true, drag: 800, slideFactor: .15, maxSpeed: 45, pushCoefficient: .25, width: 112, height: 14 },
+  'deck-section': { mass: 5, pushable: true, drag: 1000, slideFactor: .08, maxSpeed: 24, pushCoefficient: .08, width: 100, height: 42 },
+  'hull-section': { mass: 9, pushable: false, drag: 1200, slideFactor: 0, maxSpeed: 0, pushCoefficient: 0, width: 112, height: 40 },
+}
+
+export function debrisPushVelocity(kind: WreckDebrisKind, playerVelocity: Point): Point {
+  const config = DEBRIS_PHYSICS[kind]
+  if (!config.pushable) return { x: 0, y: 0 }
+  const coefficient = PLAYER_PUSH_POWER * config.pushCoefficient
+  const speed = Math.min(config.maxSpeed, Math.hypot(playerVelocity.x, playerVelocity.y) * coefficient)
+  const length = Math.hypot(playerVelocity.x, playerVelocity.y)
+  return length ? { x: playerVelocity.x / length * speed, y: playerVelocity.y / length * speed } : { x: 0, y: 0 }
+}
+
+export function applyDebrisDrag(velocity: Point, kind: WreckDebrisKind, deltaSeconds: number): Point {
+  const length = Math.hypot(velocity.x, velocity.y)
+  const nextSpeed = Math.max(0, length - DEBRIS_PHYSICS[kind].drag * deltaSeconds)
+  return length ? { x: velocity.x / length * nextSpeed, y: velocity.y / length * nextSpeed } : { x: 0, y: 0 }
+}
+
 export type WreckDebris = Point & {
   kind: WreckDebrisKind
   rotation: number
   scale: number
   count: number
+  physics: DebrisPhysicsConfig
 }
 
 export type WreckDebrisLayout = {
@@ -107,12 +137,14 @@ export function generateWreckDebris(
         if (!isValidWreckDebrisPosition(point, radius, layout, coastline, playerSpawn)) continue
         if (items.some((item) => Math.hypot(item.x - point.x, item.y - point.y) < (clustered ? 28 : 54))) continue
         const largeKinds: WreckDebrisKind[] = ['hull-section', 'spar', 'deck-section']
+        const kind = target.kind === 'hull-section' ? largeKinds[Math.floor(random() * largeKinds.length)] : target.kind
         items.push({
           ...point,
-          kind: target.kind === 'hull-section' ? largeKinds[Math.floor(random() * largeKinds.length)] : target.kind,
+          kind,
           rotation: layout.angle + (random() - .5) * 2.2,
           scale: .82 + random() * .42,
           count: target.kind === 'plank-group' ? 1 + Math.floor(random() * 3) : 1,
+          physics: { ...DEBRIS_PHYSICS[kind] },
         })
         break
       }
