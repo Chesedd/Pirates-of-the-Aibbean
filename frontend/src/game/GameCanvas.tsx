@@ -5,6 +5,7 @@ import type { Island } from '../pages/UserPage'
 import type { GamePythonBridge } from './GamePythonBridge'
 import { GameSceneLifecycle } from './GameSceneLifecycle'
 import { devCount, devDiagnosticsEnabled, installPhaserDiagnostics, type PhaserDiagnostics } from '../devDiagnostics'
+import { GAME_LOCATIONS, type GameLocationId } from './locations/gameLocations'
 
 type GameCanvasProps = {
   island: Island
@@ -17,9 +18,12 @@ type GameCanvasProps = {
   onShipExited: (island: Island) => void
   editorOpen: boolean
   onJournalClick: () => void
+  currentLocation: GameLocationId
+  onLocationChange: (location: GameLocationId) => void
+  onPersistenceError: (reason: Error) => void
 }
 
-export const GameCanvas = memo(function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick, movementUnlocked, shipExited, onShipExited, editorOpen, onJournalClick }: GameCanvasProps) {
+export const GameCanvas = memo(function GameCanvas({ island, bridge, username, keyboardEnabled, onPlayerClick, movementUnlocked, shipExited, onShipExited, editorOpen, onJournalClick, currentLocation, onLocationChange, onPersistenceError }: GameCanvasProps) {
   const renderCount = useRef(0)
   if (devDiagnosticsEnabled) devCount('GameCanvas container render', ++renderCount.current)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -28,8 +32,8 @@ export const GameCanvas = memo(function GameCanvas({ island, bridge, username, k
   const diagnosticsRef = useRef<PhaserDiagnostics | null>(null)
   const keyboardEnabledRef = useRef(keyboardEnabled)
   const initialState = useRef({ island, movementUnlocked, shipExited })
-  const callbacks = useRef({ onPlayerClick, onJournalClick, onShipExited })
-  callbacks.current = { onPlayerClick, onJournalClick, onShipExited }
+  const callbacks = useRef({ onPlayerClick, onJournalClick, onShipExited, onLocationChange, onPersistenceError })
+  callbacks.current = { onPlayerClick, onJournalClick, onShipExited, onLocationChange, onPersistenceError }
   keyboardEnabledRef.current = keyboardEnabled
 
   useEffect(() => {
@@ -41,7 +45,7 @@ export const GameCanvas = memo(function GameCanvas({ island, bridge, username, k
     const game = createGame(containerRef.current, state.island, bridge, username, () => callbacks.current.onPlayerClick(), state.movementUnlocked, state.shipExited, (value) => callbacks.current.onShipExited(value), () => callbacks.current.onJournalClick(), {
       onReady: (scene) => lifecycle.sceneReady(scene),
       onShutdown: (scene) => lifecycle.sceneShutdown(scene),
-    })
+    }, (location) => callbacks.current.onLocationChange(location), (reason) => callbacks.current.onPersistenceError(reason))
     gameRef.current = game
     const diagnostics = installPhaserDiagnostics(game, containerRef.current)
     diagnosticsRef.current = diagnostics
@@ -72,7 +76,7 @@ export const GameCanvas = memo(function GameCanvas({ island, bridge, username, k
     lifecycleRef.current?.setKeyboardEnabled(keyboardEnabled)
   }, [keyboardEnabled])
 
-  return <div className="game-canvas" ref={containerRef} aria-label={movementUnlocked ? 'Your island game view' : 'Tutorial ship cabin'} />
+  return <div className="game-canvas" ref={containerRef} aria-label={`${GAME_LOCATIONS[currentLocation].title} game view`} />
 })
 
 export type PhaserGame = Phaser.Game

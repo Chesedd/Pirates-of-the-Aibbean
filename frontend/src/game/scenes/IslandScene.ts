@@ -13,6 +13,11 @@ import {
 import { drawWreck } from '../wreckRenderer'
 import { generateWreckDebris } from '../wreckDebris'
 import { apiRequest } from '../../api/client'
+import { createPlayerAvatar } from '../player/createPlayerAvatar'
+import { GameMovementLoop } from '../movement/GameMovementLoop'
+import { LocationController } from '../locations/LocationController'
+import { createCollisionDebugView } from '../movement/CollisionDebugView'
+import { PLAYER_COLLISION_OFFSET, PLAYER_COLLISION_RADIUS } from '../player/playerConfig'
 
 const updateTiming = new DevTiming('Phaser IslandScene update')
 const islandTiming = new DevTiming('island generation/render')
@@ -21,7 +26,8 @@ export class IslandScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Container
   private keys!: GameKeyboardState
   private bridge!: GamePythonBridge
-  private lastTick = 0
+  private movementLoop!: GameMovementLoop
+  private debugPlayer!: (point: { x: number; y: number }, radius: number) => void
   private updateCount = 0
   private islandDrawn = false
   private smooth!: SmoothPlayerPosition
@@ -60,20 +66,27 @@ export class IslandScene extends Phaser.Scene {
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
     this.bridge.setIslandGeometry(coastline)
     this.bridge.setPositionPersistenceEnabled(true)
-    const body = this.add.circle(0, 0, 17, 0xf4e4c1).setStrokeStyle(5, 0x7a352c)
-    const hat = this.add.triangle(0, -22, -15, 12, 0, -13, 15, 12, 0xc93f32)
-    const name = this.add.text(0, 29, this.registry.get('username') as string, {
-      color: '#ffffff',
-      fontFamily: 'Inter, system-ui, sans-serif',
-      fontSize: '13px',
-      stroke: '#071a28',
-      strokeThickness: 3,
-    }).setOrigin(0.5, 0)
-    this.player = this.add.container(island.player.x, island.player.y, [body, hat, name])
-      .setSize(Math.max(54, name.width + 12), 66)
-      .setInteractive({ useHandCursor: true })
+    const avatar = createPlayerAvatar(this, island.player, this.registry.get('username') as string)
+    this.player = avatar.container
     this.smooth = new SmoothPlayerPosition(this.player, island.player)
     this.player.on('pointerup', () => (this.registry.get('onPlayerClick') as () => void)())
+    const location = this.registry.get('locationController') as LocationController
+    location.sceneCreated('island')
+    const debug = createCollisionDebugView(this, this.wreckLayout.colliders,
+      [{ kind: 'circle', id: 'companionway', ...this.wreckLayout.companionwayEntry, radius: 10 }],
+      [this.wreckLayout.companionwayReturn, this.wreckLayout.entranceApproach])
+    this.debugPlayer = (point, radius) => debug.updatePlayer(point, radius)
+    this.movementLoop = new GameMovementLoop((keys, position) => this.bridge.tick(keys, position), (request, next) => {
+      if (!next || this.transitioning) return
+      if (entersCompanionway(request.position, next, this.wreckLayout)) {
+        this.transitioning = true
+        location.enter(this, 'wreck-cabin', 'cabin-revisit', { mode: 'revisit' })
+        return
+      }
+      const accepted = resolveWreckMovement(request.position, next, this.wreckLayout)
+      recordGameObjectMutation('setPosition')
+      this.smooth.setLogicalTarget(accepted, this.time.now)
+    })
     if (debugSwitches.hidePlayer || debugSwitches.hideAllGameObjects) this.player.setVisible(false)
     if (!debugSwitches.disableCameraFollow) configureIslandCamera(this.cameras.main, this.player)
     if (debugSwitches.hideAllGameObjects) this.children.list.forEach((child) => {
@@ -84,6 +97,7 @@ export class IslandScene extends Phaser.Scene {
     lifecycle.onReady(this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.keys.dispose()
+      this.movementLoop.dispose()
       lifecycle.onShutdown(this)
     })
   }
@@ -122,24 +136,8 @@ export class IslandScene extends Phaser.Scene {
     if (debugSwitches.disableGameLoop) return
     this.smooth.update(time)
     if (devDiagnosticsEnabled && (++this.updateCount === 1 || this.updateCount % 100 === 0)) devCount('Phaser IslandScene game tick', this.updateCount)
-    if (time - this.lastTick >= 50) {
-      this.lastTick = time
-      const position = { ...this.smooth.logical }
-      void this.bridge.tick(this.keys.snapshot(), position).then((next) => {
-        if (next && !this.transitioning) {
-          // Inspect the authoritative intended segment before the companionway
-          // hole collider has a chance to reject it.
-          if (entersCompanionway(position, next, this.wreckLayout)) {
-            this.transitioning = true
-            this.scene.start('tutorial-ship', { mode: 'revisit' })
-            return
-          }
-          const accepted = resolveWreckMovement(position, next, this.wreckLayout)
-          recordGameObjectMutation('setPosition')
-          this.smooth.setLogicalTarget(accepted, this.time.now)
-        }
-      })
-    }
+    this.movementLoop.update(time, this.keys.snapshot(), this.smooth.logical)
+    this.debugPlayer({ x: this.smooth.logical.x + PLAYER_COLLISION_OFFSET.x, y: this.smooth.logical.y + PLAYER_COLLISION_OFFSET.y }, PLAYER_COLLISION_RADIUS)
     if (devDiagnosticsEnabled) {
       const duration = performance.now() - started
       updateTiming.add(duration)
