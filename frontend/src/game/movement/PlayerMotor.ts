@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import type { GamePosition } from '../../python/pythonProtocol'
 import { PLAYER_COLLISION_OFFSET, PLAYER_COLLISION_RADIUS } from '../player/playerConfig'
 import type { TopDownCollider } from './TopDownMovementResolver'
+import { stepPlayerVelocity } from './PlayerInertia'
 
 /** Authoritative local-player body. Artwork follows it; it never interpolates snapshots. */
 export class PlayerMotor {
@@ -14,12 +15,16 @@ export class PlayerMotor {
     scene.physics.add.existing(this.object)
     this.body = this.object.body as Phaser.Physics.Arcade.Body
     this.body.setCircle(PLAYER_COLLISION_RADIUS, 0, PLAYER_COLLISION_OFFSET.y)
-    this.body.setAllowGravity(false).setCollideWorldBounds(false)
+    this.body.setAllowGravity(false).setCollideWorldBounds(false).setMass(1)
     this.follow()
   }
   get position(): GamePosition { return { x: this.object.x, y: this.object.y } }
-  setVelocity(value: GamePosition) { this.intent = { ...value }; this.body.setVelocity(value.x, value.y) }
-  stop() { this.setVelocity({ x: 0, y: 0 }) }
+  setVelocity(value: GamePosition) { this.intent = { ...value } }
+  update(deltaSeconds: number) {
+    const velocity = stepPlayerVelocity(this.body.velocity, this.intent, deltaSeconds)
+    this.body.setVelocity(velocity.x, velocity.y)
+  }
+  stop() { this.intent = { x: 0, y: 0 }; this.body.setVelocity(0, 0) }
   follow() { this.avatar.setPosition(this.object.x, this.object.y) }
   destroy() { this.object.destroy() }
 }

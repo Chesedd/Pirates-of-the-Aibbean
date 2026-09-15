@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { generateIslandGeometry, ISLAND_CENTER, pointIsInsideIsland } from '../.test-dist/game/islandGeometry.js'
 import { createWreckLayout } from '../.test-dist/game/wreckGeometry.js'
-import { generateWreckDebris, isValidWreckDebrisPosition } from '../.test-dist/game/wreckDebris.js'
+import { applyDebrisDrag, debrisPushVelocity, generateWreckDebris, isValidWreckDebrisPosition } from '../.test-dist/game/wreckDebris.js'
 
 function fixture(seed) {
   const coastline = generateIslandGeometry(seed)
@@ -58,4 +58,21 @@ test('procedural debris preserves the player exclusion radius', () => {
     const radius = ['hull-section', 'spar', 'deck-section'].includes(item.kind) ? 58 : item.kind === 'plank-group' ? 38 : 28
     assert.ok(Math.hypot(item.x - spawn.x, item.y - spawn.y) >= radius + 110)
   }
+})
+
+test('push resistance makes plank, crate, spar, and hull progressively harder to move', () => {
+  const velocity = { x: 160, y: 0 }
+  const plank = debrisPushVelocity('plank-group', velocity).x
+  const crate = debrisPushVelocity('crate', velocity).x
+  const spar = debrisPushVelocity('spar', velocity).x
+  const hull = debrisPushVelocity('hull-section', velocity).x
+  assert.ok(plank > crate && crate > spar && spar > hull)
+  assert.equal(hull, 0)
+})
+
+test('debris drag decays motion cleanly to zero', () => {
+  const slower = applyDebrisDrag({ x: 80, y: 0 }, 'plank-group', .1)
+  const stopped = applyDebrisDrag(slower, 'plank-group', 1)
+  assert.ok(slower.x > 0 && slower.x < 80)
+  assert.deepEqual(stopped, { x: 0, y: 0 })
 })

@@ -9,7 +9,7 @@ import {
   createCompanionwayPortal, createWreckLayout, findBlockingWreckCollider, isWreckPositionWalkable,
   recoverWreckPosition, type WreckLayout,
 } from '../wreckGeometry'
-import { drawWreck } from '../wreckRenderer'
+import { drawWreck, drawWreckDebris } from '../wreckRenderer'
 import { generateWreckDebris } from '../wreckDebris'
 import { apiRequest } from '../../api/client'
 import { createPlayerAvatar } from '../player/createPlayerAvatar'
@@ -20,6 +20,7 @@ import { PLAYER_COLLISION_OFFSET, PLAYER_COLLISION_RADIUS } from '../player/play
 import { createStaticColliders, PlayerMotor } from '../movement/PlayerMotor'
 import { createPortalHint, portalActivates, type LocationPortal } from '../locations/LocationPortal'
 import { pointIsInsideIsland, type Point } from '../islandGeometry'
+import { DebrisPhysics } from '../DebrisPhysics'
 
 const updateTiming = new DevTiming('Phaser IslandScene update')
 const islandTiming = new DevTiming('island generation/render')
@@ -39,6 +40,7 @@ export class IslandScene extends Phaser.Scene {
   private portalHint!: ReturnType<typeof createPortalHint>
   private wreckLayout!: WreckLayout
   private transitioning = false
+  private debrisPhysics?: DebrisPhysics
   constructor() {
     super('island')
   }
@@ -66,9 +68,8 @@ export class IslandScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor(0x176b87)
     if (!debugSwitches.hideIsland && !debugSwitches.hideAllGameObjects) this.drawIsland(coastline)
-    if (!debugSwitches.hideIsland && !debugSwitches.hideAllGameObjects) {
-      drawWreck(this, this.wreckLayout, generateWreckDebris(island.generation_seed, this.wreckLayout, coastline, island.player))
-    }
+    const debrisLayout = generateWreckDebris(island.generation_seed, this.wreckLayout, coastline, island.player)
+    if (!debugSwitches.hideIsland && !debugSwitches.hideAllGameObjects) drawWreck(this, this.wreckLayout)
 
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
     this.bridge.setIslandGeometry(coastline)
@@ -83,6 +84,10 @@ export class IslandScene extends Phaser.Scene {
     const location = this.registry.get('locationController') as LocationController
     location.sceneCreated('island')
     this.portal = createCompanionwayPortal(this.wreckLayout)
+    if (!debugSwitches.hideIsland && !debugSwitches.hideAllGameObjects) {
+      const debrisObjects = drawWreckDebris(this, debrisLayout)
+      this.debrisPhysics = new DebrisPhysics(this, debrisLayout, debrisObjects, this.motor, solids, coastline, this.portal)
+    }
     this.portalHint = createPortalHint(this, this.portal)
     const debug = createCollisionDebugView(this, this.wreckLayout.colliders,
       [{ kind: 'orientedRect', id: this.portal.id, x: this.portal.sensor.x, y: this.portal.sensor.y,
@@ -138,9 +143,11 @@ export class IslandScene extends Phaser.Scene {
     if (!enabled) keyboard.resetKeys()
   }
 
-  update(time: number) {
+  update(time: number, delta: number) {
     const started = devDiagnosticsEnabled ? performance.now() : 0
     if (debugSwitches.disableGameLoop) return
+    this.motor.update(delta / 1000)
+    this.debrisPhysics?.update()
     let position = this.motor.position
     if (!pointIsInsideIsland(position, this.coastline)) {
       const xOnly = { x: position.x, y: this.lastPhysicsPosition.y }
