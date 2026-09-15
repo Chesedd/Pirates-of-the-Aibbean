@@ -60,6 +60,7 @@ export class TutorialShipScene extends Phaser.Scene {
     }
 
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
+    this.bridge.clearIslandGeometry()
     this.bridge.setPositionPersistenceEnabled(false)
     this.setMovementUnlocked(this.mode === 'revisit' || Boolean(this.registry.get('movementUnlocked')))
     this.registry.events.on('changedata-movementUnlocked', this.handleMovementUnlock)

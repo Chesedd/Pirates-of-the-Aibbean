@@ -58,6 +58,15 @@ test('companionway revisit skips tutorial side effects and returns to its deck p
   assert.match(scene, /if \(this\.mode === 'revisit'\)[\s\S]*?return[\s\S]*?\/game\/tutorial\/exit-ship/)
 })
 
+test('scene transitions transfer ownership of island geometry in both directions', () => {
+  const islandScene = readFileSync(new URL('../src/game/scenes/IslandScene.ts', import.meta.url), 'utf8')
+  const cabinBridgeSetup = scene.slice(scene.indexOf("this.bridge = this.registry.get('pythonBridge')"), scene.indexOf("this.registry.events.on('changedata-movementUnlocked'"))
+  assert.match(cabinBridgeSetup, /clearIslandGeometry\(\)[\s\S]*setPositionPersistenceEnabled\(false\)[\s\S]*setMovementUnlocked/)
+  assert.match(scene, /scene\.start\('island'\)/)
+  assert.match(islandScene, /setIslandGeometry\(coastline\)[\s\S]*setPositionPersistenceEnabled\(true\)/)
+  assert.match(islandScene, /scene\.start\('tutorial-ship', \{ mode: 'revisit' \}\)/)
+})
+
 test('cabin walls and locked hatch filter logical targets before interpolation', () => {
   assert.match(scene, /const accepted = cabinTarget\(position, next, this\.movementUnlocked\)/)
   assert.match(scene, /resolveCabinMovement\(previous, target, unlocked\)/)

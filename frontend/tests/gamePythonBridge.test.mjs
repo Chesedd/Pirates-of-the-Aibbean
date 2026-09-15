@@ -153,3 +153,23 @@ test('movement parallel to the coast remains available', async () => {
   await bridge.apply('along coast')
   assert.deepEqual(await bridge.tick(keys, positionNearShore), { x: positionNearShore.x, y: positionNearShore.y + 10 })
 })
+
+test('clearing island geometry allows cabin movement after an island revisit', async () => {
+  const coastline = generateIslandGeometry(42)
+  const cabinPosition = { x: 470, y: 455 }
+  const bridge = new GamePythonBridge({
+    apply: async () => {},
+    tick: async (_keys, current) => ({ x: current.x + 8, y: current.y, stdout: '' }),
+  })
+  bridge.setIslandGeometry(coastline)
+  await bridge.apply('x += 8')
+
+  // Cabin coordinates are outside the island polygon and are rejected while
+  // the island-owned geometry remains installed.
+  assert.deepEqual(await bridge.tick(keys, cabinPosition), cabinPosition)
+
+  bridge.clearIslandGeometry()
+  bridge.setPositionPersistenceEnabled(false)
+  bridge.setMovementUnlocked(true)
+  assert.deepEqual(await bridge.tick(keys, cabinPosition), { x: 478, y: 455 })
+})
