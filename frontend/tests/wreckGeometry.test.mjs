@@ -3,6 +3,7 @@ import test from 'node:test'
 import { generateIslandGeometry, pointIsInsideIsland } from '../.test-dist/game/islandGeometry.js'
 import {
   createWreckLayout,
+  entersCompanionway,
   findBlockingWreckCollider,
   isWreckPositionWalkable,
   recoverWreckPosition,
@@ -39,6 +40,18 @@ test('deck interiors and companionway approach are walkable', () => {
     assert.equal(isWreckPositionWalkable(wreckLocalToWorld(anchor, layout.angle, ...local), layout), true)
   }
   assert.equal(layout.colliders.some(({ id }) => id === 'main-hull'), false)
+  assert.equal(isWreckPositionWalkable(layout.companionwayReturn, layout), true)
+})
+
+test('raw movement can enter the companionway trigger before hole collision rejection', () => {
+  const layout = createWreckLayout(42, anchor)
+  const previous = wreckLocalToWorld(anchor, layout.angle, -145, 0)
+  const target = wreckLocalToWorld(anchor, layout.angle, -130, 0)
+  assert.equal(entersCompanionway(previous, target, layout), true)
+  assert.notDeepEqual(resolveWreckMovement(previous, target, layout), target)
+  const alongsideStart = wreckLocalToWorld(anchor, layout.angle, -145, 35)
+  const alongsideTarget = wreckLocalToWorld(anchor, layout.angle, -130, 35)
+  assert.equal(entersCompanionway(alongsideStart, alongsideTarget, layout), false)
 })
 
 test('real deck obstacles and hull sides are blocked, but nearby ground is not', () => {

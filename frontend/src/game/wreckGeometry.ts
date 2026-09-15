@@ -12,6 +12,8 @@ export type WreckLayout = {
   width: number
   entrance: Point
   entranceApproach: Point
+  companionwayEntry: Point
+  companionwayReturn: Point
   colliders: readonly WreckCollider[]
 }
 
@@ -49,6 +51,10 @@ export function createWreckLayout(seed: number, anchor: Point): WreckLayout {
     anchor, angle, variant, length: 530, width: 220,
     entrance: point(117, 139),
     entranceApproach: point(117, 242),
+    // The trigger sits just inside the collision boundary and is inspected on
+    // raw intended movement; the return point remains safely on the deck.
+    companionwayEntry: point(-132, 0),
+    companionwayReturn: point(-155, 0),
     colliders: [
       // Thin rails follow the visible hull perimeter. The starboard rail is split
       // around the gangway, rather than turning the whole deck into an obstacle.
@@ -74,6 +80,18 @@ export function createWreckLayout(seed: number, anchor: Point): WreckLayout {
       rect('shore-cargo', 408, 208, 53, 32),
     ],
   }
+}
+
+/** Detects a movement segment entering the small deck-side companionway trigger. */
+export function entersCompanionway(previous: Point, target: Point, layout: WreckLayout): boolean {
+  const dx = target.x - previous.x
+  const dy = target.y - previous.y
+  const lengthSquared = dx * dx + dy * dy
+  const projection = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1,
+    ((layout.companionwayEntry.x - previous.x) * dx + (layout.companionwayEntry.y - previous.y) * dy) / lengthSquared))
+  const closestX = previous.x + dx * projection
+  const closestY = previous.y + dy * projection
+  return Math.hypot(closestX - layout.companionwayEntry.x, closestY - layout.companionwayEntry.y) <= 10
 }
 
 export function isWreckPositionWalkable(point: Point, layout: WreckLayout): boolean {

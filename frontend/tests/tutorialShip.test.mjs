@@ -46,6 +46,18 @@ test('tutorial cabin contains a physical, server-authoritative exit', () => {
   assert.match(scene, /\/game\/tutorial\/exit-ship/)
 })
 
+test('companionway revisit skips tutorial side effects and returns to its deck point', () => {
+  const islandScene = readFileSync(new URL('../src/game/scenes/IslandScene.ts', import.meta.url), 'utf8')
+  assert.match(islandScene, /entersCompanionway\(position, next, this\.wreckLayout\)/)
+  assert.match(islandScene, /scene\.start\('tutorial-ship', \{ mode: 'revisit' \}\)/)
+  assert.match(scene, /CABIN_REENTRY_SPAWN = \{ x: 470, y: 455 \}/)
+  assert.match(scene, /this\.mode === 'tutorial'.*this\.createStoryText\(\)/)
+  assert.match(scene, /this\.mode === 'revisit' \|\| Boolean\(this\.registry\.get\('movementUnlocked'\)\)/)
+  assert.match(scene, /island\.player = \{ \.\.\.layout\.companionwayReturn \}/)
+  assert.match(scene, /apiRequest\('\/game\/position', \{ method: 'PUT'/)
+  assert.match(scene, /if \(this\.mode === 'revisit'\)[\s\S]*?return[\s\S]*?\/game\/tutorial\/exit-ship/)
+})
+
 test('cabin walls and locked hatch filter logical targets before interpolation', () => {
   assert.match(scene, /const accepted = cabinTarget\(position, next, this\.movementUnlocked\)/)
   assert.match(scene, /resolveCabinMovement\(previous, target, unlocked\)/)
