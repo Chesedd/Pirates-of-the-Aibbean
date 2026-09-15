@@ -42,15 +42,15 @@ test('tutorial cabin contains a physical, server-authoritative exit', () => {
   assert.match(scene, /setData\('role', 'tutorial-exit'\)/)
   assert.match(scene, /setData\('transitionImplemented', false\)/)
   assert.doesNotMatch(scene, /exit\.on\('pointerup'/)
-  assert.match(scene, /accepted\.y > CABIN_WALKABLE\.exitY/)
+  assert.match(scene, /portalActivates\(CABIN_EXIT_PORTAL, position, this\.motor\.intent\)/)
   assert.match(scene, /\/game\/tutorial\/exit-ship/)
 })
 
 test('companionway revisit skips tutorial side effects and returns to its deck point', () => {
   const islandScene = readFileSync(new URL('../src/game/scenes/IslandScene.ts', import.meta.url), 'utf8')
-  assert.match(islandScene, /entersCompanionway\(request\.position, next, this\.wreckLayout\)/)
+  assert.match(islandScene, /portalActivates\(this\.portal, position, this\.motor\.intent\)/)
   assert.match(islandScene, /location\.enter\(this, 'wreck-cabin', 'cabin-revisit', \{ mode: 'revisit' \}\)/)
-  assert.match(scene, /CABIN_REENTRY_SPAWN = \{ x: 470, y: 455 \}/)
+  assert.match(readFileSync(new URL('../src/game/cabinCollision.ts', import.meta.url), 'utf8'), /CABIN_REENTRY_SPAWN = \{ x: 470, y: 420 \}/)
   assert.match(scene, /this\.mode === 'tutorial'.*this\.createStoryText\(\)/)
   assert.match(scene, /this\.mode === 'revisit' \|\| Boolean\(this\.registry\.get\('movementUnlocked'\)\)/)
   assert.match(scene, /island\.player = \{ \.\.\.layout\.companionwayReturn \}/)
@@ -67,9 +67,10 @@ test('scene transitions transfer ownership of island geometry in both directions
   assert.match(islandScene, /location\.enter\(this, 'wreck-cabin', 'cabin-revisit', \{ mode: 'revisit' \}\)/)
 })
 
-test('cabin walls and locked hatch filter logical targets before interpolation', () => {
-  assert.match(scene, /const accepted = cabinTarget\(request\.position, next, this\.movementUnlocked\)/)
-  assert.match(scene, /resolveCabinMovement\(previous, target, unlocked\)/)
+test('cabin uses continuous physics walls and an unlockable hatch gate', () => {
+  assert.match(scene, /createStaticColliders\(this, \[\.\.\.CABIN_OBSTACLES, \.\.\.boundary\]\)/)
+  assert.match(scene, /this\.physics\.add\.collider\(this\.motor\.object, solids\)/)
+  assert.match(scene, /unlocked && this\.hatchGate/)
   assert.match(scene, /setPositionPersistenceEnabled\(false\)/)
 })
 

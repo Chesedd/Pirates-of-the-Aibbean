@@ -1,6 +1,7 @@
 import { ISLAND_CENTER, pointIsInsideIsland, type Point } from './islandGeometry.js'
 import { findBlockingCollider, resolveTopDownMovement, type TopDownCollider } from './movement/TopDownMovementResolver.js'
 import { PLAYER_COLLISION_RADIUS } from './player/playerConfig.js'
+import type { LocationPortal } from './locations/LocationPortal.js'
 
 export type WreckCollider = TopDownCollider
 
@@ -79,6 +80,13 @@ export function createWreckLayout(seed: number, anchor: Point): WreckLayout {
       rect('shore-cargo', 408, 208, 53, 32),
     ],
   }
+}
+
+export function createCompanionwayPortal(layout: WreckLayout): LocationPortal {
+  const direction = { x: -Math.cos(layout.angle), y: -Math.sin(layout.angle) }
+  const center = wreckLocalToWorld(layout.anchor, layout.angle, -82, 0)
+  return { id: 'wreck-companionway', destination: 'wreck-cabin', destinationSpawn: 'cabin-revisit', label: 'В каюту',
+    sensor: { ...center, width: 64, height: 42, angle: layout.angle }, approachDirection: direction }
 }
 
 /** Detects a movement segment entering the small deck-side companionway trigger. */

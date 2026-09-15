@@ -32,13 +32,15 @@ export class GameKeyboardState {
   private enabled = true
   private readonly downCodes = new Set<string>()
   private readonly keydown = (event: KeyboardEventLike) => {
-    if (this.enabled && gameKeyName(event.code)) this.downCodes.add(event.code)
+    if (this.enabled && gameKeyName(event.code) && !this.downCodes.has(event.code)) {
+      this.downCodes.add(event.code); this.onChange?.()
+    }
   }
   private readonly keyup = (event: KeyboardEventLike) => {
-    this.downCodes.delete(event.code)
+    if (this.downCodes.delete(event.code)) this.onChange?.()
   }
 
-  constructor(private readonly source: KeyboardEventSource) {
+  constructor(private readonly source: KeyboardEventSource, private readonly onChange?: () => void) {
     source.on('keydown', this.keydown)
     source.on('keyup', this.keyup)
   }

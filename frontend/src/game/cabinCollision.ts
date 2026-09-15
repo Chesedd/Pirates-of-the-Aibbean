@@ -1,7 +1,13 @@
 import { findBlockingCollider, resolveTopDownMovement, type Point, type TopDownCollider } from './movement/TopDownMovementResolver.js'
 import { PLAYER_COLLISION_OFFSET, PLAYER_COLLISION_RADIUS } from './player/playerConfig.js'
+import type { LocationPortal } from './locations/LocationPortal.js'
 
 export const CABIN_WALKABLE = { left: 90, right: 810, top: 78, bottom: 485, hatchLeft: 402, hatchRight: 538, exitY: 530 } as const
+export const CABIN_EXIT_PORTAL: LocationPortal = {
+  id: 'cabin-stairs', destination: 'island', destinationSpawn: 'companionway-return', label: 'На палубу',
+  sensor: { x: 470, y: 500, width: 156, height: 70 }, approachDirection: { x: 0, y: 1 },
+}
+export const CABIN_REENTRY_SPAWN = { x: 470, y: 420 } as const
 /** Insets follow the furniture bases rather than their decorative outlines. */
 export const CABIN_OBSTACLES: readonly TopDownCollider[] = [
   { kind: 'rect', id: 'hammock', x: 112, y: 104, width: 184, height: 90 },

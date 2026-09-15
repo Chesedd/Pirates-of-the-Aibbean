@@ -136,13 +136,13 @@ test('movement within the island is accepted', async () => {
     { x: ISLAND_CENTER + 10, y: ISLAND_CENTER })
 })
 
-test('an attempt to cross the coast is rejected at the last valid position', async () => {
+test('bridge preserves outward movement as intent for frame-level coastline handling', async () => {
   const coastline = generateIslandGeometry(42)
   const shore = coastline.reduce((rightmost, point) => point.x > rightmost.x ? point : rightmost)
   const positionNearShore = { x: shore.x - 1, y: shore.y }
   const bridge = collisionBridge(() => ({ x: shore.x + 1000, y: shore.y }))
   await bridge.apply('escape')
-  assert.deepEqual(await bridge.tick(keys, positionNearShore), positionNearShore)
+  assert.deepEqual(await bridge.tick(keys, positionNearShore), { x: positionNearShore.x + 20, y: positionNearShore.y })
 })
 
 test('movement parallel to the coast remains available', async () => {
@@ -164,9 +164,8 @@ test('clearing island geometry allows cabin movement after an island revisit', a
   bridge.setIslandGeometry(coastline)
   await bridge.apply('x += 8')
 
-  // Cabin coordinates are outside the island polygon and are rejected while
-  // the island-owned geometry remains installed.
-  assert.deepEqual(await bridge.tick(keys, cabinPosition), cabinPosition)
+  // Geometry ownership no longer changes worker intent; the scene constrains its physics body.
+  assert.deepEqual(await bridge.tick(keys, cabinPosition), { x: 478, y: 455 })
 
   bridge.clearIslandGeometry()
   bridge.setPositionPersistenceEnabled(false)

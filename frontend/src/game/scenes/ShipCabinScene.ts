@@ -1,25 +1,26 @@
 import Phaser from 'phaser'
 import type { GamePythonBridge } from '../GamePythonBridge'
 import type { SceneLifecycleCallbacks } from '../createGame'
-import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordGameObjectMutation, recordPhaserUpdate } from '../../devDiagnostics'
+import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordPhaserUpdate } from '../../devDiagnostics'
 
 const updateTiming = new DevTiming('Phaser ShipCabinScene update')
 import { GameKeyboardState } from '../gameKeyboard'
-import { SmoothPlayerPosition } from '../SmoothPlayerPosition'
 import { apiRequest } from '../../api/client'
 import type { Island } from '../../pages/UserPage'
-import { CABIN_WALKABLE, resolveCabinMovement } from '../cabinCollision'
+import { CABIN_EXIT_PORTAL, CABIN_REENTRY_SPAWN, resolveCabinMovement } from '../cabinCollision'
 import { createWreckLayout } from '../wreckGeometry'
 import { createPlayerAvatar } from '../player/createPlayerAvatar'
-import { GameMovementLoop } from '../movement/GameMovementLoop'
+import { GameMovementLoop, movementIntentVelocity } from '../movement/GameMovementLoop'
 import { LocationController } from '../locations/LocationController'
 import { createCollisionDebugView } from '../movement/CollisionDebugView'
 import { PLAYER_COLLISION_OFFSET, PLAYER_COLLISION_RADIUS } from '../player/playerConfig'
 import { CABIN_OBSTACLES } from '../cabinCollision'
+import { createStaticColliders, PlayerMotor } from '../movement/PlayerMotor'
+import { createPortalHint, portalActivates } from '../locations/LocationPortal'
 
 export const TUTORIAL_CABIN = { x: 50, y: 35, width: 800, height: 490 } as const
 export const TUTORIAL_PLAYER_SPAWN = { x: 470, y: 300 } as const
-export const CABIN_REENTRY_SPAWN = { x: 470, y: 455 } as const
+export { CABIN_REENTRY_SPAWN } from '../cabinCollision'
 export type TutorialShipSceneData = { mode?: 'tutorial' | 'revisit' }
 export function cabinTarget(previous: { x: number; y: number }, target: { x: number; y: number }, unlocked: boolean) {
   return resolveCabinMovement(previous, target, unlocked)
@@ -30,9 +31,11 @@ export class ShipCabinScene extends Phaser.Scene {
   private keys!: GameKeyboardState
   private bridge!: GamePythonBridge
   private movementLoop!: GameMovementLoop
-  private debugPlayer!: (point: { x: number; y: number }, radius: number) => void
+  private debugPlayer!: (point: { x: number; y: number }, radius: number, velocity?: { x: number; y: number }, intent?: { x: number; y: number }) => void
   private updateCount = 0
-  private smooth!: SmoothPlayerPosition
+  private motor!: PlayerMotor
+  private portalHint!: ReturnType<typeof createPortalHint>
+  private hatchGate?: Phaser.GameObjects.Zone
   private movementUnlocked = false
   private exiting = false
   private hatch?: Phaser.GameObjects.Rectangle
@@ -71,20 +74,17 @@ export class ShipCabinScene extends Phaser.Scene {
     this.bridge.setPositionPersistenceEnabled(false)
     this.setMovementUnlocked(this.mode === 'revisit' || Boolean(this.registry.get('movementUnlocked')))
     this.registry.events.on('changedata-movementUnlocked', this.handleMovementUnlock)
-    this.keys = new GameKeyboardState(this.input.keyboard!)
+    this.keys = new GameKeyboardState(this.input.keyboard!, () => this.movementLoop.requestNow(this.time.now, this.keys.snapshot(), this.motor.position))
     const location = this.registry.get('locationController') as LocationController
     location.sceneCreated('wreck-cabin')
-    const exitTrigger = { kind: 'rect' as const, id: 'cabin-exit', x: CABIN_WALKABLE.hatchLeft, y: CABIN_WALKABLE.exitY, width: CABIN_WALKABLE.hatchRight - CABIN_WALKABLE.hatchLeft, height: 20 }
+    const exitTrigger = { kind: 'rect' as const, id: CABIN_EXIT_PORTAL.id, x: CABIN_EXIT_PORTAL.sensor.x - CABIN_EXIT_PORTAL.sensor.width / 2,
+      y: CABIN_EXIT_PORTAL.sensor.y - CABIN_EXIT_PORTAL.sensor.height / 2, width: CABIN_EXIT_PORTAL.sensor.width, height: CABIN_EXIT_PORTAL.sensor.height }
     const debug = createCollisionDebugView(this, CABIN_OBSTACLES, [exitTrigger], [TUTORIAL_PLAYER_SPAWN, CABIN_REENTRY_SPAWN])
     this.debugPlayer = (point, radius) => debug.updatePlayer(point, radius)
+    this.portalHint = createPortalHint(this, CABIN_EXIT_PORTAL)
     this.movementLoop = new GameMovementLoop((keys, position) => this.bridge.tick(keys, position), (request, next) => {
       if (!next) return
-      const accepted = cabinTarget(request.position, next, this.movementUnlocked)
-      if (this.movementUnlocked && accepted.x >= CABIN_WALKABLE.hatchLeft && accepted.x <= CABIN_WALKABLE.hatchRight && accepted.y > CABIN_WALKABLE.exitY) {
-        this.exitShip(); return
-      }
-      recordGameObjectMutation('setPosition')
-      this.smooth.setLogicalTarget(accepted, this.time.now)
+      this.motor.setVelocity(movementIntentVelocity(request.position, next, request.keys))
     })
     const lifecycle = this.registry.get('sceneLifecycle') as SceneLifecycleCallbacks
     lifecycle.onReady(this)
@@ -93,6 +93,7 @@ export class ShipCabinScene extends Phaser.Scene {
       this.registry.events.off('changedata-movementUnlocked', this.handleMovementUnlock)
       this.keys.dispose()
       this.movementLoop.dispose()
+      this.portalHint.destroy()
       lifecycle.onShutdown(this)
     })
   }
@@ -159,9 +160,11 @@ export class ShipCabinScene extends Phaser.Scene {
     g.lineStyle(4, 0x392619).strokeCircle(548, 111, 19).lineBetween(536, 91, 560, 91)
 
     // The hatch opens after movement training; crossing it (not clicking it) exits.
-    this.hatch = this.add.rectangle(470, 506, 136, 38, 0x54321f).setStrokeStyle(5, 0xc08a4b)
+    this.hatch = this.add.rectangle(470, 500, 156, 70, 0x54321f).setStrokeStyle(6, 0xc08a4b)
       .setData('role', 'tutorial-exit').setData('transitionImplemented', false)
-    this.add.circle(514, 506, 5, 0xe2b85f)
+    const stairs = this.add.graphics().setDepth(this.hatch.depth + 1)
+    stairs.fillStyle(0x120d0a).fillRect(404, 477, 132, 47).lineStyle(4, 0xd3a354)
+    for (const y of [481, 491, 501, 511, 521]) stairs.lineBetween(412, y, 528, y)
 
     // Decorative porthole is mounted flat in the upper wall.
     g.fillStyle(0x235568).fillCircle(405, 48, 13)
@@ -187,7 +190,19 @@ export class ShipCabinScene extends Phaser.Scene {
     this.player = createPlayerAvatar(this, spawn, this.registry.get('username') as string).container
       .setData('role', 'cabin-player')
     this.player.on('pointerup', () => (this.registry.get('onPlayerClick') as () => void)())
-    this.smooth = new SmoothPlayerPosition(this.player, spawn)
+    this.motor = new PlayerMotor(this, this.player, spawn)
+    const boundary = [
+      { kind: 'rect' as const, id: 'top-wall', x: 72, y: 57, width: 756, height: 21 },
+      { kind: 'rect' as const, id: 'left-wall', x: 72, y: 57, width: 18, height: 468 },
+      { kind: 'rect' as const, id: 'right-wall', x: 810, y: 57, width: 18, height: 468 },
+      { kind: 'rect' as const, id: 'bottom-left', x: 72, y: 485, width: 330, height: 40 },
+      { kind: 'rect' as const, id: 'bottom-right', x: 538, y: 485, width: 290, height: 40 },
+    ]
+    const solids = createStaticColliders(this, [...CABIN_OBSTACLES, ...boundary])
+    this.physics.add.collider(this.motor.object, solids)
+    this.hatchGate = this.add.zone(470, 495, 136, 20)
+    this.physics.add.existing(this.hatchGate, true)
+    this.physics.add.collider(this.motor.object, this.hatchGate)
   }
 
   private createStoryText() {
@@ -220,6 +235,7 @@ export class ShipCabinScene extends Phaser.Scene {
         .setStrokeStyle(5, unlocked ? 0xd5a35d : 0xc08a4b)
         .setData('transitionImplemented', unlocked)
     }
+    if (unlocked && this.hatchGate) { this.hatchGate.destroy(); this.hatchGate = undefined }
   }
 
   private exitShip() {
@@ -247,10 +263,16 @@ export class ShipCabinScene extends Phaser.Scene {
   update(time: number) {
     const started = devDiagnosticsEnabled ? performance.now() : 0
     if (debugSwitches.disableGameLoop) return
-    this.smooth.update(time)
+    const position = this.motor.position
+    this.motor.follow()
+    this.portalHint.update(position)
+    if (this.movementUnlocked && portalActivates(CABIN_EXIT_PORTAL, position, this.motor.intent)) {
+      this.motor.stop(); this.exitShip(); return
+    }
     if (devDiagnosticsEnabled && (++this.updateCount === 1 || this.updateCount % 100 === 0)) devCount('Phaser TutorialShipScene game tick', this.updateCount)
-    this.movementLoop.update(time, this.keys.snapshot(), this.smooth.logical)
-    this.debugPlayer({ x: this.smooth.logical.x + PLAYER_COLLISION_OFFSET.x, y: this.smooth.logical.y + PLAYER_COLLISION_OFFSET.y }, PLAYER_COLLISION_RADIUS)
+    this.movementLoop.update(time, this.keys.snapshot(), position)
+    this.debugPlayer({ x: position.x + PLAYER_COLLISION_OFFSET.x, y: position.y + PLAYER_COLLISION_OFFSET.y }, PLAYER_COLLISION_RADIUS,
+      this.motor.body.velocity, this.motor.intent)
     if (devDiagnosticsEnabled) {
       const duration = performance.now() - started
       updateTiming.add(duration)
