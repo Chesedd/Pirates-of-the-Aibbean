@@ -9,9 +9,12 @@ import { SmoothPlayerPosition } from '../SmoothPlayerPosition'
 import { apiRequest } from '../../api/client'
 import type { Island } from '../../pages/UserPage'
 import { CABIN_WALKABLE, resolveCabinMovement } from '../cabinCollision'
+import { createWreckLayout } from '../wreckGeometry'
 
 export const TUTORIAL_CABIN = { x: 50, y: 35, width: 800, height: 490 } as const
 export const TUTORIAL_PLAYER_SPAWN = { x: 470, y: 300 } as const
+export const CABIN_REENTRY_SPAWN = { x: 470, y: 455 } as const
+export type TutorialShipSceneData = { mode?: 'tutorial' | 'revisit' }
 export function cabinTarget(previous: { x: number; y: number }, target: { x: number; y: number }, unlocked: boolean) {
   return resolveCabinMovement(previous, target, unlocked)
 }
@@ -26,18 +29,24 @@ export class TutorialShipScene extends Phaser.Scene {
   private movementUnlocked = false
   private exiting = false
   private hatch?: Phaser.GameObjects.Rectangle
+  private mode: 'tutorial' | 'revisit' = 'tutorial'
   private readonly handleMovementUnlock = (_parent: unknown, unlocked: unknown) => {
     this.setMovementUnlocked(Boolean(unlocked))
   }
 
   constructor() { super('tutorial-ship') }
 
+  init(data: TutorialShipSceneData) {
+    this.mode = data.mode ?? 'tutorial'
+    this.exiting = false
+  }
+
   create() {
     this.cameras.main.setBackgroundColor(0x100b09)
     if (!debugSwitches.hideIsland && !debugSwitches.hideAllGameObjects) this.drawCabin()
     if (!debugSwitches.hideAllGameObjects) this.createJournal()
     this.createPlayer()
-    if (!debugSwitches.hideAllGameObjects) this.createStoryText()
+    if (this.mode === 'tutorial' && !debugSwitches.hideAllGameObjects) this.createStoryText()
 
     if (debugSwitches.hidePlayer || debugSwitches.hideAllGameObjects) this.player.setVisible(false)
     if (debugSwitches.hideAllGameObjects) this.children.list.forEach((child) => {
@@ -52,7 +61,7 @@ export class TutorialShipScene extends Phaser.Scene {
 
     this.bridge = this.registry.get('pythonBridge') as GamePythonBridge
     this.bridge.setPositionPersistenceEnabled(false)
-    this.setMovementUnlocked(Boolean(this.registry.get('movementUnlocked')))
+    this.setMovementUnlocked(this.mode === 'revisit' || Boolean(this.registry.get('movementUnlocked')))
     this.registry.events.on('changedata-movementUnlocked', this.handleMovementUnlock)
     this.keys = new GameKeyboardState(this.input.keyboard!)
     const lifecycle = this.registry.get('sceneLifecycle') as SceneLifecycleCallbacks
@@ -159,11 +168,12 @@ export class TutorialShipScene extends Phaser.Scene {
     const name = this.add.text(0, 29, this.registry.get('username') as string, {
       color: '#fff', fontSize: '13px', stroke: '#071a28', strokeThickness: 3,
     }).setOrigin(.5, 0)
-    this.player = this.add.container(TUTORIAL_PLAYER_SPAWN.x, TUTORIAL_PLAYER_SPAWN.y,
+    const spawn = this.mode === 'revisit' ? CABIN_REENTRY_SPAWN : TUTORIAL_PLAYER_SPAWN
+    this.player = this.add.container(spawn.x, spawn.y,
       [shadow, body, head, hat, facing, name]).setSize(70, 66).setData('role', 'tutorial-player')
       .setInteractive({ useHandCursor: true })
     this.player.on('pointerup', () => (this.registry.get('onPlayerClick') as () => void)())
-    this.smooth = new SmoothPlayerPosition(this.player, TUTORIAL_PLAYER_SPAWN)
+    this.smooth = new SmoothPlayerPosition(this.player, spawn)
   }
 
   private createStoryText() {
@@ -201,6 +211,16 @@ export class TutorialShipScene extends Phaser.Scene {
   private exitShip() {
     if (this.exiting) return
     this.exiting = true
+    if (this.mode === 'revisit') {
+      const island = this.registry.get('island') as Island
+      const layout = createWreckLayout(island.generation_seed, island.wreck)
+      island.player = { ...layout.companionwayReturn }
+      this.registry.set('island', island)
+      void apiRequest('/game/position', { method: 'PUT', body: JSON.stringify(island.player) })
+        .then(() => this.scene.start('island'))
+        .catch(() => { this.exiting = false })
+      return
+    }
     void apiRequest<Island>('/game/tutorial/exit-ship', { method: 'POST' }).then((island) => {
       this.registry.set('island', island)
       ;(this.registry.get('onShipExited') as (value: Island) => void)(island)

@@ -7,7 +7,7 @@ import { configureIslandCamera, generateIslandGeometry, ISLAND_CENTER } from '..
 import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled, recordGameObjectMutation, recordPhaserUpdate } from '../../devDiagnostics'
 import { SmoothPlayerPosition } from '../SmoothPlayerPosition'
 import {
-  createWreckLayout, findBlockingWreckCollider, isWreckPositionWalkable,
+  createWreckLayout, entersCompanionway, findBlockingWreckCollider, isWreckPositionWalkable,
   recoverWreckPosition, resolveWreckMovement, type WreckLayout,
 } from '../wreckGeometry'
 import { drawWreck } from '../wreckRenderer'
@@ -26,11 +26,13 @@ export class IslandScene extends Phaser.Scene {
   private islandDrawn = false
   private smooth!: SmoothPlayerPosition
   private wreckLayout!: WreckLayout
+  private transitioning = false
   constructor() {
     super('island')
   }
 
   create() {
+    this.transitioning = false
     const island = this.registry.get('island') as Island
     const coastline = generateIslandGeometry(island.generation_seed)
     this.wreckLayout = createWreckLayout(island.generation_seed, island.wreck)
@@ -124,7 +126,14 @@ export class IslandScene extends Phaser.Scene {
       this.lastTick = time
       const position = { ...this.smooth.logical }
       void this.bridge.tick(this.keys.snapshot(), position).then((next) => {
-        if (next) {
+        if (next && !this.transitioning) {
+          // Inspect the authoritative intended segment before the companionway
+          // hole collider has a chance to reject it.
+          if (entersCompanionway(position, next, this.wreckLayout)) {
+            this.transitioning = true
+            this.scene.start('tutorial-ship', { mode: 'revisit' })
+            return
+          }
           const accepted = resolveWreckMovement(position, next, this.wreckLayout)
           recordGameObjectMutation('setPosition')
           this.smooth.setLogicalTarget(accepted, this.time.now)
