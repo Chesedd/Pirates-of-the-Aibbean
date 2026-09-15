@@ -16,6 +16,7 @@ export class PlayerMotor {
     this.body = this.object.body as Phaser.Physics.Arcade.Body
     this.body.setCircle(PLAYER_COLLISION_RADIUS, 0, PLAYER_COLLISION_OFFSET.y)
     this.body.setAllowGravity(false).setCollideWorldBounds(false).setMass(1)
+    this.body.pushable = false
     this.follow()
   }
   get position(): GamePosition { return { x: this.object.x, y: this.object.y } }
