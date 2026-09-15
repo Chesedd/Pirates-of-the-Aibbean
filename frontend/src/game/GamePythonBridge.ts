@@ -1,6 +1,6 @@
 import type { GameKeys, GamePosition } from '../python/pythonProtocol.js'
 import type { PythonRunner } from '../python/PythonRunner.js'
-import { pointIsInsideIsland, type Point } from './islandGeometry.js'
+import type { Point } from './islandGeometry.js'
 import { debugSwitches, DevTiming, devCount, devDiagnosticsEnabled } from '../devDiagnostics.js'
 
 export const MAX_TICK_MOVE = 20
@@ -9,12 +9,10 @@ export class GamePythonBridge {
   private active = false
   private busy = false
   private disposed = false
-  private coastline: Point[] | null = null
   private movementUnlocked = true
   private positionPersistenceEnabled = true
   private tickCount = 0
   private readonly tickTiming = new DevTiming('Python game tick')
-  private readonly collisionTiming = new DevTiming('collision check')
   constructor(private readonly runner: Pick<PythonRunner, 'apply' | 'tick'>,
     private readonly onOutput: (message: string) => void = () => undefined,
     private readonly onPosition: (position: GamePosition) => void = () => undefined) {}
@@ -26,12 +24,12 @@ export class GamePythonBridge {
 
   /** Uses the very same polygon that the scene renders; no collision shape is derived separately. */
   setIslandGeometry(coastline: Point[]): void {
-    this.coastline = coastline
+    void coastline
   }
 
   /** Removes scene-owned island boundaries when movement happens in another world space. */
   clearIslandGeometry(): void {
-    this.coastline = null
+    // Coastline constraints now run after every Arcade Physics step in IslandScene.
   }
 
   setMovementUnlocked(unlocked: boolean): void {
@@ -73,11 +71,6 @@ export class GamePythonBridge {
         x: position.x + Math.max(-MAX_TICK_MOVE, Math.min(MAX_TICK_MOVE, result.x - position.x)),
         y: position.y + Math.max(-MAX_TICK_MOVE, Math.min(MAX_TICK_MOVE, result.y - position.y)),
       }
-      const collisionStarted = devDiagnosticsEnabled ? performance.now() : 0
-      const outsideIsland = this.coastline ? !pointIsInsideIsland(next, this.coastline) : false
-      if (devDiagnosticsEnabled) this.collisionTiming.add(performance.now() - collisionStarted)
-      if (outsideIsland) return position
-      if (this.positionPersistenceEnabled) this.onPosition(next)
       return next
     } catch (reason) {
       this.active = false
@@ -87,6 +80,11 @@ export class GamePythonBridge {
       if (devDiagnosticsEnabled) this.tickTiming.add(performance.now() - started)
       this.busy = false
     }
+  }
+
+  /** Persistence is fed by the authoritative physics body, never a worker result. */
+  reportPosition(position: GamePosition): void {
+    if (!this.disposed && this.positionPersistenceEnabled) this.onPosition(position)
   }
 
   dispose(): void {

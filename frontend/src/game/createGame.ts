@@ -34,6 +34,10 @@ export function createGame(
     transparent: false,
     parent,
     backgroundColor: '#176b87',
+    physics: {
+      default: 'arcade',
+      arcade: { gravity: { x: 0, y: 0 }, debug: false },
+    },
     scale: {
       mode: Phaser.Scale.RESIZE,
       width: '100%',

@@ -75,16 +75,17 @@ export function drawWreck(scene: Phaser.Scene, layout: WreckLayout, debris?: Wre
     .lineBetween(-286, 28, -176, 28)
 
   // Recessed companionway: framed deck cut-out with treads descending toward the bow.
-  g.fillStyle(0x4a2b18).fillRect(-126, -28, 96, 56)
-  g.lineStyle(6, 0x21150f).strokeRect(-126, -28, 96, 56)
-  g.fillStyle(0x130c08).fillRect(-112, -18, 70, 36)
+  g.fillStyle(0xf0b84e, .09).fillRoundedRect(-139, -43, 122, 86, 8)
+  g.fillStyle(0x4a2b18).fillRect(-136, -38, 116, 76)
+  g.lineStyle(7, 0xc08a4b).strokeRect(-136, -38, 116, 76)
+  g.fillStyle(0x130c08).fillRect(-118, -25, 80, 50)
   g.fillStyle(0x58351f).fillPoints([
-    { x: -126, y: -28 }, { x: -112, y: -18 }, { x: -112, y: 18 }, { x: -126, y: 28 },
+    { x: -136, y: -38 }, { x: -118, y: -25 }, { x: -118, y: 25 }, { x: -136, y: 38 },
   ], true).fillPoints([
-    { x: -30, y: -28 }, { x: -42, y: -18 }, { x: -42, y: 18 }, { x: -30, y: 28 },
+    { x: -20, y: -38 }, { x: -38, y: -25 }, { x: -38, y: 25 }, { x: -20, y: 38 },
   ], true)
-  g.lineStyle(5, 0xc08a4b).lineBetween(-118, -22, -38, -22)
-  for (const x of [-100, -86, -72, -58]) g.lineBetween(x, -14, x, 14)
+  g.lineStyle(5, 0xd3a354).lineBetween(-126, -31, -30, -31)
+  for (const x of [-108, -91, -74, -57, -40]) g.lineBetween(x, -21, x, 21)
 
   // Broken mast stump.
   g.fillStyle(0x58351f).fillCircle(8, -6, 27)

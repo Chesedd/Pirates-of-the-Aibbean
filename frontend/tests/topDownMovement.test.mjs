@@ -25,4 +25,4 @@ test('substeps prevent tunnelling through a thin obstacle', () => {
   const next = resolveTopDownMovement({ x: -20, y: 0 }, { x: 20, y: 0 }, world({ kind: 'rect', id: 'wall', x: 0, y: -20, width: 1, height: 40 }), 2)
   assert.ok(next.x < 0)
 })
-test('player footprint is the shared compact radius', () => assert.equal(PLAYER_COLLISION_RADIUS, 12.5))
+test('player footprint is the shared compact radius', () => assert.equal(PLAYER_COLLISION_RADIUS, 12))

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { GameMovementLoop, normalizeKeyboardDiagonal } from '../.test-dist/game/movement/GameMovementLoop.js'
+import { GameMovementLoop, movementIntentVelocity, normalizeKeyboardDiagonal } from '../.test-dist/game/movement/GameMovementLoop.js'
 const keys = (values = {}) => ({ w:false,a:false,s:false,d:false,up:false,down:false,left:false,right:false,...values })
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { promise, resolve } }
 test('a due tick becomes pending and runs after the active tick', async () => {
@@ -20,4 +20,13 @@ test('keyboard diagonal has the same magnitude as cardinal movement', () => {
   const next = normalizeKeyboardDiagonal({x:0,y:0},{x:8,y:-8},keys({w:true,d:true}))
   assert.ok(Math.abs(Math.hypot(next.x,next.y)-8) < 1e-9)
   assert.deepEqual(normalizeKeyboardDiagonal({x:0,y:0},{x:8,y:8},keys()), {x:8,y:8})
+})
+test('movement intent converts an 8px Python delta over 50ms to 160px/s', () => {
+  assert.deepEqual(movementIntentVelocity({x:100,y:100},{x:108,y:100},keys({d:true})), {x:160,y:0})
+})
+test('stale results remain deltas and stop intent is immediate', () => {
+  const started = {x:100,y:100}, physicsNow = {x:103,y:100}
+  assert.deepEqual(movementIntentVelocity(started,{x:108,y:100},keys({d:true})), {x:160,y:0})
+  assert.deepEqual(physicsNow, {x:103,y:100}, 'conversion never mutates or snaps the live body')
+  assert.deepEqual(movementIntentVelocity(physicsNow,physicsNow,keys()), {x:0,y:0})
 })
